@@ -8,13 +8,7 @@
   "dependencies": {
     "axios": "^1.12.2"
   },
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "CommonJS",
-    "esModuleInterop": true,
-    "strict": true,
-    "skipLibCheck": true
-  },
+ 
   "scripts": {
     "start": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" ./downloader.ts",
     "build": "tsc ./downloader.ts && node ./downloader.js "

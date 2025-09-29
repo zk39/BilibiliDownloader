@@ -14,3 +14,6 @@ build/
 .env
 .env.*.local
 .env.local
+
+*.mp4
+*.m4a

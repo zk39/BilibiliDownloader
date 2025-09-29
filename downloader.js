@@ -42,12 +42,27 @@ var rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
-rl.question('Enter the video URL: ', function (url) { return __awaiter(void 0, void 0, void 0, function () {
-    return __generator(this, function (_a) {
-        if (url.includes('bilibili') || url.includes('b23.tv')) {
-            console.log('Bilibili downloader is not implemented yet.');
-        }
-        return [2 /*return*/];
-    });
-}); });
+function askUrl() {
+    var _this = this;
+    rl.question('Enter the video URL (or q/quit to exit): ', function (url) { return __awaiter(_this, void 0, void 0, function () {
+        var trimmed;
+        return __generator(this, function (_a) {
+            trimmed = url.trim().toLowerCase();
+            if (trimmed === 'q' || trimmed === 'quit') {
+                console.log('Bye!');
+                rl.close();
+                return [2 /*return*/];
+            }
+            if (url.includes('bilibili') || url.includes('b23.tv')) {
+                console.log('Bilibili downloader is not implemented yet.');
+                rl.close();
+                return [2 /*return*/];
+            }
+            console.log('Invalid plz reEnter');
+            askUrl();
+            return [2 /*return*/];
+        });
+    }); });
+}
+askUrl();
 // Bilibili downloader
