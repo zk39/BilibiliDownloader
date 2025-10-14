@@ -55,26 +55,37 @@ let dolby = []
 //   -H 'upgrade-insecure-requests: 1' \
 //   -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
 
-function askUrl() {
-	rl.question('Enter the video URL (or q/quit to exit): ', async (url) => {
-		//trim user input
+function cli() {
 
-		const trimmed = url.trim().toLowerCase();
-		if (trimmed === 'q' || trimmed === 'quit') {
-			console.log('Bye!');
-			rl.close();
-			return;
-		}
-		if (url.includes('bilibili') || url.includes('b23.tv')) {
-			console.log('Bilibili downloader is not implemented yet.');
-			rl.close();
-			return;
-		}
-		console.log('Invalid plz reEnter');
-		askUrl();
-	});
+	try {
+		rl.question('Enter the video URL (or q/quit to exit): ', async (url) => {
+			const trimmed = url.trim().toLowerCase();
+			if (trimmed === 'q' || trimmed === 'quit') {
+				console.log('Bye!');
+				rl.close();
+				return;
+			}
+			if (trimmed === '' || trimmed === 'enter') {
+				await getHtml();
+				await readHtml();
+				console.log('✅ Done! Enter another URL or q to quit.\n');
+				return cli();
+			}
+			if (url.includes('bilibili') || url.includes('b23.tv')) {
+				console.log('Bilibili downloader is not implemented yet.');
+
+				return cli();
+			}
+			console.log('Invalid input, please re-enter.');
+			return cli();
+		});
+	} catch (error) {
+		console.error('⚠️ Error:', error);
+		console.log('Please try again.\n');
+		return cli();
+	}
+
 }
-
 // read html file,extract json data and assign to audioArr and videoArr
 async function readHtml() {
 	const filePath = path.join(__dirname, 'test.html');
@@ -83,7 +94,7 @@ async function readHtml() {
 	extractJsonFromHtml(html);
 }
 
-async function getVideo() {
+async function getHtml() {
 
 	const response = await axios.get('https://www.bilibili.com/video/BV1yyN1eMEgj/', {
 		params: {
@@ -101,9 +112,6 @@ async function getVideo() {
 function extractJsonFromHtml(html: string): any | null {
 	const regrex = /window\.__playinfo__\s*=\s*(\{.*?\})\s*<\/script>/;
 	const match = html.match(regrex);
-
-
-
 	if (match && match[1]) {
 		const playinfoJson = JSON.parse(match[1]);
 
@@ -114,10 +122,18 @@ function extractJsonFromHtml(html: string): any | null {
 	}
 
 }
+// welcome message
+const welcomeMessage = () => console.log(`
+╔══════════════════════════════════════╗
+║     ♡  Welcome to B站 Downloader ♡   ║
+║          喵~ Let's start! 🐾         ║
+╚══════════════════════════════════════╝
+`);
 // Bilibili downloader
 async function main() {
-	await getVideo();
-	await readHtml();
+	welcomeMessage();
+	cli();
+
 }
 
 main();

@@ -45,6 +45,28 @@ var rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
+var cookies = "testcookie=1; buvid4=C423C8AD-EF49-BC28-6A6E-33372674F50709892-024062613-SR8SF7x5RpCnI6TCDNls8g%3D%3D; buvid_fp_plain=undefined; enable_web_push=DISABLE; DedeUserID=11261913; DedeUserID__ckMd5=4c0a6ef27f979261; PVID=4; enable_feed_channel=ENABLE; _uuid=51B103782-4595-196A-510CC-FC339D99EE3228201infoc; header_theme_version=OPEN; theme-tip-show=SHOWED; theme-avatar-tip-show=SHOWED; theme-switch-show=SHOWED; go-old-space=1; buvid3=27BA2B4D-61FB-A14B-128E-F1014127D897546748infoc; b_nut=1753994746; rpdid=|(u)|mYlJR)~0J'u~lRl)kk~J; CURRENT_QUALITY=80; fingerprint=20377a6f592a25efc50b26acf0ec1fdd; buvid_fp=20377a6f592a25efc50b26acf0ec1fdd; bmg_af_switch=1; bmg_src_def_domain=i0.hdslb.com; SESSDATA=229771db%2C1774705383%2C7b3fb%2A91CjASvd8LYSu-NZONuGHK1twrzgJfD-P1450C7HL-qbp3zPrZPwJEhOYRlvKBc-FwOJ4SVmpUSDJlYXdXclh0MmZmWHFLX0tvRXpXZHUxNHBIenVOZWFXUTBzQzNRVlpzdlFGTENyZENmR2dKNFpMbmt1bTZIYllacTZZV3RyQV84WWFXb0txWFVRIIEC; bili_jct=c1e81537b356e50a51976abd3e9f9e02; sid=8fvslthu; home_feed_column=5; browser_resolution=1592-732; CURRENT_FNVAL=4048; bsource=search_google; bili_ticket=eyJhbGciOiJIUzI1NiIsImtpZCI6InMwMyIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTk0MjMzNDUsImlhdCI6MTc1OTE2NDA4NSwicGx0IjotMX0.H7pDUhOuEPxQEvcI2KsVRwCjs_haCzDaeH_lgUu5bg4; bili_ticket_expires=1759423285; bp_t_offset_11261913=1118091235391700992; b_lsid=7717C5A8_19996AFA49B";
+var headers = {
+    'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+    'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
+    'cache-control': 'no-cache',
+    'pragma': 'no-cache',
+    'priority': 'u=0, i',
+    'referer': 'https://search.bilibili.com/video?keyword=%E9%80%86%E5%90%91b%E7%AB%99%E8%A7%86%E9%A2%91playurl&from_source=webtop_search&spm_id_from=333.1007&search_source=5',
+    'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-fetch-dest': 'document',
+    'sec-fetch-mode': 'navigate',
+    'sec-fetch-site': 'same-origin',
+    'sec-fetch-user': '?1',
+    'upgrade-insecure-requests': '1',
+    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+    'cookie': cookies
+};
+var audioArr = [];
+var videoArr = [];
+var dolby = [];
 // curl 'https://www.bilibili.com/video/BV1yyN1eMEgj/?spm_id_from=333.337.search-card.all.click&vd_source=020f49bde169054c895cbefa73c9d6ca' \
 //   -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7' \
 //   -H 'accept-language: zh-CN,zh;q=0.9,en;q=0.8' \
@@ -62,41 +84,60 @@ var rl = readline.createInterface({
 //   -H 'sec-fetch-user: ?1' \
 //   -H 'upgrade-insecure-requests: 1' \
 //   -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
-function askUrl() {
+function cli() {
     var _this = this;
-    rl.question('Enter the video URL (or q/quit to exit): ', function (url) { return __awaiter(_this, void 0, void 0, function () {
-        var trimmed;
-        return __generator(this, function (_a) {
-            trimmed = url.trim().toLowerCase();
-            if (trimmed === 'q' || trimmed === 'quit') {
-                console.log('Bye!');
-                rl.close();
-                return [2 /*return*/];
-            }
-            if (url.includes('bilibili') || url.includes('b23.tv')) {
-                console.log('Bilibili downloader is not implemented yet.');
-                rl.close();
-                return [2 /*return*/];
-            }
-            console.log('Invalid plz reEnter');
-            askUrl();
-            return [2 /*return*/];
-        });
-    }); });
+    try {
+        rl.question('Enter the video URL (or q/quit to exit): ', function (url) { return __awaiter(_this, void 0, void 0, function () {
+            var trimmed;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        trimmed = url.trim().toLowerCase();
+                        if (trimmed === 'q' || trimmed === 'quit') {
+                            console.log('Bye!');
+                            rl.close();
+                            return [2 /*return*/];
+                        }
+                        if (!(trimmed === '' || trimmed === 'enter')) return [3 /*break*/, 3];
+                        return [4 /*yield*/, getHtml()];
+                    case 1:
+                        _a.sent();
+                        return [4 /*yield*/, readHtml()];
+                    case 2:
+                        _a.sent();
+                        console.log('✅ Done! Enter another URL or q to quit.\n');
+                        return [2 /*return*/, cli()];
+                    case 3:
+                        if (url.includes('bilibili') || url.includes('b23.tv')) {
+                            console.log('Bilibili downloader is not implemented yet.');
+                            return [2 /*return*/, cli()];
+                        }
+                        console.log('Invalid input, please re-enter.');
+                        return [2 /*return*/, cli()];
+                }
+            });
+        }); });
+    }
+    catch (error) {
+        console.error('⚠️ Error:', error);
+        console.log('Please try again.\n');
+        return cli();
+    }
 }
+// read html file,extract json data and assign to audioArr and videoArr
 function readHtml() {
     return __awaiter(this, void 0, void 0, function () {
         var filePath, html;
         return __generator(this, function (_a) {
             filePath = path.join(__dirname, 'test.html');
             html = fs.readFileSync(filePath, 'utf-8');
-            console.log(html);
+            //console.log(html);
+            extractJsonFromHtml(html);
             return [2 /*return*/];
         });
     });
 }
-//askUrl();
-function getVideo() {
+function getHtml() {
     return __awaiter(this, void 0, void 0, function () {
         var response;
         return __generator(this, function (_a) {
@@ -106,34 +147,36 @@ function getVideo() {
                             'spm_id_from': '333.337.search-card.all.click',
                             'vd_source': '020f49bde169054c895cbefa73c9d6ca'
                         },
-                        headers: {
-                            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-                            'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
-                            'cache-control': 'no-cache',
-                            'pragma': 'no-cache',
-                            'priority': 'u=0, i',
-                            'referer': 'https://search.bilibili.com/video?keyword=%E9%80%86%E5%90%91b%E7%AB%99%E8%A7%86%E9%A2%91playurl&from_source=webtop_search&spm_id_from=333.1007&search_source=5',
-                            'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"',
-                            'sec-ch-ua-mobile': '?0',
-                            'sec-ch-ua-platform': '"Windows"',
-                            'sec-fetch-dest': 'document',
-                            'sec-fetch-mode': 'navigate',
-                            'sec-fetch-site': 'same-origin',
-                            'sec-fetch-user': '?1',
-                            'upgrade-insecure-requests': '1',
-                            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
-                            'cookie': "testcookie=1; buvid4=C423C8AD-EF49-BC28-6A6E-33372674F50709892-024062613-SR8SF7x5RpCnI6TCDNls8g%3D%3D; buvid_fp_plain=undefined; enable_web_push=DISABLE; DedeUserID=11261913; DedeUserID__ckMd5=4c0a6ef27f979261; PVID=4; enable_feed_channel=ENABLE; _uuid=51B103782-4595-196A-510CC-FC339D99EE3228201infoc; header_theme_version=OPEN; theme-tip-show=SHOWED; theme-avatar-tip-show=SHOWED; theme-switch-show=SHOWED; go-old-space=1; buvid3=27BA2B4D-61FB-A14B-128E-F1014127D897546748infoc; b_nut=1753994746; rpdid=|(u)|mYlJR)~0J'u~lRl)kk~J; CURRENT_QUALITY=80; fingerprint=20377a6f592a25efc50b26acf0ec1fdd; buvid_fp=20377a6f592a25efc50b26acf0ec1fdd; bmg_af_switch=1; bmg_src_def_domain=i0.hdslb.com; SESSDATA=229771db%2C1774705383%2C7b3fb%2A91CjASvd8LYSu-NZONuGHK1twrzgJfD-P1450C7HL-qbp3zPrZPwJEhOYRlvKBc-FwOJ4SVmpUSDJlYXdXclh0MmZmWHFLX0tvRXpXZHUxNHBIenVOZWFXUTBzQzNRVlpzdlFGTENyZENmR2dKNFpMbmt1bTZIYllacTZZV3RyQV84WWFXb0txWFVRIIEC; bili_jct=c1e81537b356e50a51976abd3e9f9e02; sid=8fvslthu; home_feed_column=5; browser_resolution=1592-732; CURRENT_FNVAL=4048; bsource=search_google; bili_ticket=eyJhbGciOiJIUzI1NiIsImtpZCI6InMwMyIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTk0MjMzNDUsImlhdCI6MTc1OTE2NDA4NSwicGx0IjotMX0.H7pDUhOuEPxQEvcI2KsVRwCjs_haCzDaeH_lgUu5bg4; bili_ticket_expires=1759423285; bp_t_offset_11261913=1118091235391700992; b_lsid=7717C5A8_19996AFA49B"
-                        }
+                        headers: headers
                     })];
                 case 1:
                     response = _a.sent();
-                    console.log(response.data);
+                    //console.log(response.data);
                     fs.writeFileSync('./test.html', response.data, 'utf-8');
-                    console.log('HTML 已保存到 test.html');
                     return [2 /*return*/];
             }
         });
     });
 }
+function extractJsonFromHtml(html) {
+    var regrex = /window\.__playinfo__\s*=\s*(\{.*?\})\s*<\/script>/;
+    var match = html.match(regrex);
+    if (match && match[1]) {
+        var playinfoJson = JSON.parse(match[1]);
+        audioArr = playinfoJson.data.dash.audio;
+        videoArr = playinfoJson.data.dash.video;
+        dolby = playinfoJson.data.dash.dolby;
+        console.log('Extracted JSON:', audioArr);
+    }
+}
 // Bilibili downloader
-await getVideo();
+function main() {
+    return __awaiter(this, void 0, void 0, function () {
+        return __generator(this, function (_a) {
+            console.log("\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n\u2551     \u2661  Welcome to Downloader \u2661       \u2551\n\u2551          \u55B5~ Let's start! \uD83D\uDC3E          \u2551\n\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n");
+            cli();
+            return [2 /*return*/];
+        });
+    });
+}
+main();
