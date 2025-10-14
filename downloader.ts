@@ -6,6 +6,7 @@ import * as os from 'os';
 import * as stream from 'stream';
 import { promisify } from 'util';
 import * as readline from 'readline';
+import * as chalk from 'chalk';
 
 console.log('Downloader module loaded');
 const rl = readline.createInterface({
@@ -54,14 +55,14 @@ let dolby = []
 //   -H 'sec-fetch-user: ?1' \
 //   -H 'upgrade-insecure-requests: 1' \
 //   -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
-
+const log = console.log;
 function cli() {
 
 	try {
 		rl.question('Enter the video URL (or q/quit to exit): ', async (url) => {
 			const trimmed = url.trim().toLowerCase();
 			if (trimmed === 'q' || trimmed === 'quit') {
-				console.log('Bye!');
+				log(chalk.green('Bye!'));
 				rl.close();
 				return;
 			}
@@ -94,8 +95,8 @@ async function readHtml() {
 	extractJsonFromHtml(html);
 }
 
-async function getHtml() {
 
+async function getHtml() {
 	const response = await axios.get('https://www.bilibili.com/video/BV1yyN1eMEgj/', {
 		params: {
 			'spm_id_from': '333.337.search-card.all.click',
@@ -103,10 +104,8 @@ async function getHtml() {
 		},
 		headers: headers
 	});
-
 	//console.log(response.data);
 	fs.writeFileSync('./test.html', response.data, 'utf-8');
-
 }
 
 function extractJsonFromHtml(html: string): any | null {
@@ -114,10 +113,15 @@ function extractJsonFromHtml(html: string): any | null {
 	const match = html.match(regrex);
 	if (match && match[1]) {
 		const playinfoJson = JSON.parse(match[1]);
-
+		//using filter for audioarr and videoarr
+		const filePath = path.join(__dirname, 'audio.json');
+		const aud = fs.readFileSync(filePath, 'utf-8');
 		audioArr = playinfoJson.data.dash.audio;
 		videoArr = playinfoJson.data.dash.video;
 		dolby = playinfoJson.data.dash.dolby;
+
+		fs.writeFileSync('./audio.json', playinfoJson.data.dash.audio, 'utf-8');
+
 		console.log('Extracted JSON:', audioArr);
 	}
 
@@ -131,7 +135,7 @@ const welcomeMessage = () => console.log(`
 `);
 // Bilibili downloader
 async function main() {
-	welcomeMessage();
+	//welcomeMessage();
 	cli();
 
 }
