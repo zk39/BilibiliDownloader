@@ -84,10 +84,7 @@ async function readHtml() {
 
 async function getHtml() {
 	const response = await axios.get('https://www.bilibili.com/video/BV18nxfzPESy/', {
-		params: {
-			'spm_id_from': '333.337.search-card.all.click',
-			'vd_source': '020f49bde169054c895cbefa73c9d6ca'
-		},
+
 		headers: headers
 	});
 	//console.log(response.data);
@@ -108,12 +105,11 @@ function extractJsonFromHtml(html: string): any | null {
 
 		fs.writeFileSync('./playinfo.json', JSON.stringify({ audioArr, videoArr, dolby }, null, 4), 'utf-8');
 
-
-
 	}
 
 }
-function downloadAudio() {
+
+async function downloadAudio() {
 	const len = audioArr.length;
 	if (audioArr.length === 0) {
 		log(chalk.red('No audio streams found to download.'));
@@ -122,9 +118,35 @@ function downloadAudio() {
 	if (audioArr.length > 1) {
 		log(chalk.yellow(`Multiple audio streams found (${len}). Downloading the highest quality one.`));
 		// log(chalk.blue(`Audio stream details: ${JSON.stringify(audioArr, null, 4)}`));
+		// use sort to get the highest quality audio at this time
 		audioArr.sort((a, b) => b.bandwidth - a.bandwidth);
-	}
+		const bestAudio = audioArr[0];
+		const urlsToDownload = [bestAudio.baseUrl, bestAudio.base_url, ...bestAudio.backupUrl, ...bestAudio.backup_url];
+		for (const url of urlsToDownload) {
+			if (url) {
+				log(chalk.blue(`Downloading audio from URL: ${url}`));
+				const writer = fs.createWriteStream(path.join(__dirname, `audio_test.m4a`));
+				const res = await axios.get(url, {
 
+					headers: headers,
+					responseType: 'stream'
+				});
+				await new Promise((resolve, reject) => {
+					res.data.pipe(writer);
+					writer.on('finish', () => {
+
+						resolve(null);
+
+					});
+					writer.on('error', reject);
+
+				})
+				console.log('✅ finished');
+				break;
+			}
+		}
+
+	}
 }
 // welcome message
 const welcomeMessage = () => console.log(`
