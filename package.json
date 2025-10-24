@@ -7,7 +7,8 @@
   },
   "dependencies": {
     "axios": "^1.12.2",
-    "chalk": "^4.1.2"
+    "chalk": "^4.1.2",
+    "cli-progress": "^3.12.0"
   },
   "scripts": {
     "dev": "tsx watch downloader.ts",
@@ -15,5 +16,15 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc && node dist/downloader.js",
     "dev:strict": "concurrently \"npm run typecheck\" \"npm run dev\""
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "*.m4a",
+      "*.mp4",
+      "*.mp3",
+      "test.html",
+      "playinfo.json"
+    ],
+    "ext": "ts,js,json"
   }
 }
