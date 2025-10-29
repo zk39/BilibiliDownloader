@@ -76,15 +76,17 @@ function cli() {
 				return;
 			}
 			if (trimmed === '' || trimmed === 'enter') {
-				await getHtml();
+				await getHtml('error');
 				await readHtml();
 				await downloadAudio();
 				console.log('✅ Done! Enter another URL or q to quit.\n');
 				return cli();
 			}
-			if (url.includes('bilibili') || url.includes('b23.tv')) {
-				console.log('Bilibili downloader is not implemented yet.');
-
+			if (url.includes('bilibili') || url.includes('bv')) {
+				await getHtml(url);
+				await readHtml();
+				await downloadAudio();
+				console.log('✅ Done! Enter another URL or q to quit.\n');
 				return cli();
 			}
 			console.log('Invalid input, please re-enter.');
@@ -106,14 +108,20 @@ async function readHtml() {
 }
 
 
-async function getHtml() {
-	const response = await axios.get('https://www.bilibili.com/video/BV18nxfzPESy/', {
+async function getHtml(url: string) {
+	const response = await axios.get(url, {
 		headers: headers
 	});
 	//console.log(response.data);
 	fs.writeFileSync(path.join(downloadDir, 'test.html'), response.data, 'utf-8');
 }
 
+function extractBVID(url: string): string {
+	const bvidMatch = url.match(/BV[0-9A-Za-z]+/);
+	if (bvidMatch) {
+		return bvidMatch[0];
+	}
+}
 function extractJsonFromHtml(html: string): any | null {
 	const regrex = /window\.__playinfo__\s*=\s*(\{.*?\})\s*<\/script>/;
 	const match = html.match(regrex);
@@ -152,7 +160,7 @@ async function downloadAudio() {
 	}
 	if (audioArr.length >= 1) {
 		log(chalk.yellow(`Multiple audio streams found (${len}). Downloading the highest quality one.`));
-		// log(chalk.blue(`Audio stream details: ${JSON.stringify(audioArr, null, 4)}`));
+
 		// use sort to get the highest quality audio at this time
 		audioArr.sort((a, b) => b.bandwidth - a.bandwidth);
 		const bestAudio = audioArr[0];
@@ -201,3 +209,4 @@ async function main() {
 }
 
 main();
+extractBVID('https://www.bilibili.com/video/BV18nxfzPESy/')
