@@ -83,8 +83,9 @@ function cli() {
 				return cli();
 			}
 			if (url.includes('bilibili') || url.includes('bv')) {
+				videoInfo.bvid = extractBVID(url);
 				await getHtml(url);
-				await readHtml();
+				//await readHtml();
 				await downloadAudio();
 				console.log('✅ Done! Enter another URL or q to quit.\n');
 				return cli();
@@ -101,10 +102,10 @@ function cli() {
 }
 // read html file,extract json data and assign to audioArr and videoArr
 async function readHtml() {
-	const filePath = path.join(downloadDir, 'test.html');
-	const html = fs.readFileSync(filePath, 'utf-8');
-	//console.log(html);
-	extractJsonFromHtml(html);
+	// const filePath = path.join(downloadDir, 'test.html');
+	// const html = fs.readFileSync(filePath, 'utf-8');
+	// //console.log(html);
+	// extractJsonFromHtml(html);
 }
 
 
@@ -113,7 +114,8 @@ async function getHtml(url: string) {
 		headers: headers
 	});
 	//console.log(response.data);
-	fs.writeFileSync(path.join(downloadDir, 'test.html'), response.data, 'utf-8');
+	extractJsonFromHtml(response.data);
+	//fs.writeFileSync(path.join(downloadDir, 'test.html'), response.data, 'utf-8');
 }
 
 function extractBVID(url: string): string {
@@ -136,7 +138,7 @@ function extractJsonFromHtml(html: string): any | null {
 		videoInfo.title = html.match(/<title[^>]*>([^<]+)<\/title>/)[1].trim();
 		videoInfo.author = html.match(/<meta[^>]*name="author"[^>]*content="([^"]*)"/)[1];
 		videoInfo.description = html.match(/<meta[^>]*name="description"[^>]*content="([^"]*)"/)[1];
-		videoInfo.bvid = html.match(/BV[\w]+/)[1];
+
 		log(chalk.green(`Video Title: ${videoInfo.title}`));
 		log(chalk.green(`Author: ${videoInfo.author}`));
 		log(chalk.green(`BVID: ${videoInfo.bvid}`));
@@ -197,8 +199,8 @@ async function downloadAudio() {
 // welcome message
 const welcomeMessage = () => console.log(`
 ╔══════════════════════════════════════╗
-║     ♡  Welcome to B站 Downloader ♡   ║
-║          喵~ Let's start! 🐾         ║
+║ ♡  Welcome to Bilibili Downloader ♡  ║
+║          ~ Let's start!              ║
 ╚══════════════════════════════════════╝
 `);
 // Bilibili downloader
