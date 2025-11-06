@@ -8,14 +8,17 @@
   "dependencies": {
     "axios": "^1.12.2",
     "chalk": "^4.1.2",
-    "cli-progress": "^3.12.0"
+    "cli-progress": "^3.12.0",
+     
+    "typedoc-plugin-markdown": "^4.9.0"
   },
   "scripts": {
     "dev": "tsx watch downloader.ts",
     "start": "tsx downloader.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc && node dist/downloader.js",
-    "dev:strict": "concurrently \"npm run typecheck\" \"npm run dev\""
+    "dev:strict": "concurrently \"npm run typecheck\" \"npm run dev\"",
+	"docs": "typedoc"	
   },
   "nodemonConfig": {
     "ignore": [
