@@ -72,24 +72,28 @@ function cli() {
 			const trimmed = url.trim().toLowerCase();
 			if (trimmed === 'q' || trimmed === 'quit') {
 				log(chalk.green('Bye!'));
-				rl.close();
+				cleanup();
+				process.exit(0);
 				return;
 			}
-			if (trimmed === '' || trimmed === 'enter') {
-				await getHtml('error');
-				await readHtml();
-				await downloadAudio();
-				console.log('✅ Done! Enter another URL or q to quit.\n');
-				return cli();
-			}
+
 			if (url.includes('bilibili') || url.includes('bv')) {
-				videoInfo.bvid = extractBVID(url);
-				await getHtml(url);
-				//await readHtml();
-				await downloadAudio();
-				console.log('✅ Done! Enter another URL or q to quit.\n');
-				return cli();
+				try {
+					videoInfo.bvid = extractBVID(url);
+					log(chalk.blue(`Extracted BVID: ${videoInfo.bvid}`));
+					await getHtml(url);
+
+					await downloadAudio();
+					console.log('✅ Done! Enter another URL or q to quit.\n');
+					cleanup();
+					return cli();
+				} catch (error) {
+					console.error('⚠️ Error during processing:', error);
+					log('Please try again.\n');
+					return cli();
+				}
 			}
+			cleanup();
 			console.log('Invalid input, please re-enter.');
 			return cli();
 		});
@@ -100,16 +104,9 @@ function cli() {
 	}
 
 }
-// read html file,extract json data and assign to audioArr and videoArr
-async function readHtml() {
-	// const filePath = path.join(downloadDir, 'test.html');
-	// const html = fs.readFileSync(filePath, 'utf-8');
-	// //console.log(html);
-	// extractJsonFromHtml(html);
-}
-
 
 async function getHtml(url: string) {
+	//1. url is a simple video url
 	const response = await axios.get(url, {
 		headers: headers
 	});
@@ -194,6 +191,12 @@ async function downloadAudio() {
 
 
 
+	}
+}
+
+function cleanup() {
+	if (!rl.close) {
+		rl.close();
 	}
 }
 // welcome message
