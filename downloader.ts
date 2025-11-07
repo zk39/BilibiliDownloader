@@ -81,14 +81,14 @@ function cli() {
 				try {
 					videoInfo.bvid = extractBVID(url);
 					log(chalk.blue(`Extracted BVID: ${videoInfo.bvid}`));
-					await getHtml(url);
+					await getBVHtml(url);
 
 					await downloadAudio();
-					console.log('✅ Done! Enter another URL or q to quit.\n');
+					console.log('Done! Enter another URL or q to quit.\n');
 					cleanup();
 					return cli();
 				} catch (error) {
-					console.error('⚠️ Error during processing:', error);
+					console.error(' Error during processing:', error);
 					log('Please try again.\n');
 					return cli();
 				}
@@ -105,14 +105,29 @@ function cli() {
 
 }
 
-async function getHtml(url: string) {
+
+
+async function getBVHtml(url: string) {
 	//1. url is a simple video url
+
 	const response = await axios.get(url, {
 		headers: headers
 	});
 	//console.log(response.data);
 	extractJsonFromHtml(response.data);
 	//fs.writeFileSync(path.join(downloadDir, 'test.html'), response.data, 'utf-8');
+}
+
+async function getSeasonHtml(url: string) {
+	//2. url is a season url
+	// url example: 
+	// https://api.bilibili.com/x/polymer/web-space/seasons_archives_list?season_id=2209693&page_num=2&page_size=100
+	// @season_id,page_size,page_num are required parameters
+	const seasonBaseUrl = ' https://api.bilibili.com/x/polymer/web-space/seasons_archives_list?'
+	const response = await axios.get(url, {
+		headers: headers
+	});
+	//console.log(response.data);
 }
 
 function extractBVID(url: string): string {
