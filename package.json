@@ -24,10 +24,21 @@
     "ignore": [
       "*.m4a",
       "*.mp4",
+	  "*.flac",
       "*.mp3",
       "test.html",
       "playinfo.json"
     ],
     "ext": "ts,js,json"
-  }
+  },
+  "bin": "./downloader.js",
+  "pkg": {
+    "assets": ["node_modules/chalk/**/*"],
+    "targets": ["node18-win-x64", "node18-macos-x64"]
+  },
+  "name": "bilibili-audio-downloader",
+  "version": "0.0.1",
+   "description": "Download audio from Bilibili videos",
+  "author": "kun",
+  "license": "MIT"
 }

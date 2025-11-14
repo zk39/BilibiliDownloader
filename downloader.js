@@ -35,83 +35,105 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+        if (ar || !(i in from)) {
+            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+            ar[i] = from[i];
+        }
+    }
+    return to.concat(ar || Array.prototype.slice.call(from));
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 var axios_1 = require("axios");
 var fs = require("fs");
 var path = require("path");
 var readline = require("readline");
-console.log('Downloader module loaded');
+var chalk = require("chalk");
+// Initialize videoInfo with empty strings
+var videoInfo = {
+    title: '',
+    author: '',
+    description: '',
+    uploadDate: '',
+    bvid: ''
+};
+var log = console.log;
+log('Downloader module loaded');
 var rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
-var cookies = "testcookie=1; buvid4=C423C8AD-EF49-BC28-6A6E-33372674F50709892-024062613-SR8SF7x5RpCnI6TCDNls8g%3D%3D; buvid_fp_plain=undefined; enable_web_push=DISABLE; DedeUserID=11261913; DedeUserID__ckMd5=4c0a6ef27f979261; PVID=4; enable_feed_channel=ENABLE; _uuid=51B103782-4595-196A-510CC-FC339D99EE3228201infoc; header_theme_version=OPEN; theme-tip-show=SHOWED; theme-avatar-tip-show=SHOWED; theme-switch-show=SHOWED; go-old-space=1; buvid3=27BA2B4D-61FB-A14B-128E-F1014127D897546748infoc; b_nut=1753994746; rpdid=|(u)|mYlJR)~0J'u~lRl)kk~J; CURRENT_QUALITY=80; fingerprint=20377a6f592a25efc50b26acf0ec1fdd; buvid_fp=20377a6f592a25efc50b26acf0ec1fdd; bmg_af_switch=1; bmg_src_def_domain=i0.hdslb.com; SESSDATA=229771db%2C1774705383%2C7b3fb%2A91CjASvd8LYSu-NZONuGHK1twrzgJfD-P1450C7HL-qbp3zPrZPwJEhOYRlvKBc-FwOJ4SVmpUSDJlYXdXclh0MmZmWHFLX0tvRXpXZHUxNHBIenVOZWFXUTBzQzNRVlpzdlFGTENyZENmR2dKNFpMbmt1bTZIYllacTZZV3RyQV84WWFXb0txWFVRIIEC; bili_jct=c1e81537b356e50a51976abd3e9f9e02; sid=8fvslthu; home_feed_column=5; browser_resolution=1592-732; CURRENT_FNVAL=4048; bsource=search_google; bili_ticket=eyJhbGciOiJIUzI1NiIsImtpZCI6InMwMyIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTk0MjMzNDUsImlhdCI6MTc1OTE2NDA4NSwicGx0IjotMX0.H7pDUhOuEPxQEvcI2KsVRwCjs_haCzDaeH_lgUu5bg4; bili_ticket_expires=1759423285; bp_t_offset_11261913=1118091235391700992; b_lsid=7717C5A8_19996AFA49B";
-var headers = {
-    'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-    'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
-    'cache-control': 'no-cache',
-    'pragma': 'no-cache',
-    'priority': 'u=0, i',
-    'referer': 'https://search.bilibili.com/video?keyword=%E9%80%86%E5%90%91b%E7%AB%99%E8%A7%86%E9%A2%91playurl&from_source=webtop_search&spm_id_from=333.1007&search_source=5',
-    'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '"Windows"',
-    'sec-fetch-dest': 'document',
-    'sec-fetch-mode': 'navigate',
-    'sec-fetch-site': 'same-origin',
-    'sec-fetch-user': '?1',
-    'upgrade-insecure-requests': '1',
-    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
-    'cookie': cookies
+// ==================== Config ====================
+var config = {
+    //create downloads directory if not exists
+    downloadDir: path.join(__dirname, "downloads"),
+    cookieFile: path.join(__dirname, 'cookies.txt'),
+    headers: {
+        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'cache-control': 'no-cache',
+        'pragma': 'no-cache',
+        'priority': 'u=0, i',
+        'referer': 'https://www.bilibili.com',
+        'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'sec-fetch-dest': 'document',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'same-origin',
+        'sec-fetch-user': '?1',
+        'upgrade-insecure-requests': '1',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+        'cookie': ''
+    }
 };
 var audioArr = [];
 var videoArr = [];
 var dolby = [];
-// curl 'https://www.bilibili.com/video/BV1yyN1eMEgj/?spm_id_from=333.337.search-card.all.click&vd_source=020f49bde169054c895cbefa73c9d6ca' \
-//   -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7' \
-//   -H 'accept-language: zh-CN,zh;q=0.9,en;q=0.8' \
-//   -H 'cache-control: no-cache' \
-//   -b $'testcookie=1; buvid4=C423C8AD-EF49-BC28-6A6E-33372674F50709892-024062613-SR8SF7x5RpCnI6TCDNls8g%3D%3D; buvid_fp_plain=undefined; enable_web_push=DISABLE; DedeUserID=11261913; DedeUserID__ckMd5=4c0a6ef27f979261; PVID=4; enable_feed_channel=ENABLE; _uuid=51B103782-4595-196A-510CC-FC339D99EE3228201infoc; header_theme_version=OPEN; theme-tip-show=SHOWED; theme-avatar-tip-show=SHOWED; theme-switch-show=SHOWED; go-old-space=1; buvid3=27BA2B4D-61FB-A14B-128E-F1014127D897546748infoc; b_nut=1753994746; rpdid=|(u)|mYlJR)~0J\'u~lRl)kk~J; CURRENT_QUALITY=80; fingerprint=20377a6f592a25efc50b26acf0ec1fdd; buvid_fp=20377a6f592a25efc50b26acf0ec1fdd; bmg_af_switch=1; bmg_src_def_domain=i0.hdslb.com; SESSDATA=229771db%2C1774705383%2C7b3fb%2A91CjASvd8LYSu-NZONuGHK1twrzgJfD-P1450C7HL-qbp3zPrZPwJEhOYRlvKBc-FwOJ4SVmpUSDJlYXdXclh0MmZmWHFLX0tvRXpXZHUxNHBIenVOZWFXUTBzQzNRVlpzdlFGTENyZENmR2dKNFpMbmt1bTZIYllacTZZV3RyQV84WWFXb0txWFVRIIEC; bili_jct=c1e81537b356e50a51976abd3e9f9e02; sid=8fvslthu; home_feed_column=5; browser_resolution=1592-732; CURRENT_FNVAL=4048; bsource=search_google; bili_ticket=eyJhbGciOiJIUzI1NiIsImtpZCI6InMwMyIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTk0MjMzNDUsImlhdCI6MTc1OTE2NDA4NSwicGx0IjotMX0.H7pDUhOuEPxQEvcI2KsVRwCjs_haCzDaeH_lgUu5bg4; bili_ticket_expires=1759423285; bp_t_offset_11261913=1118091235391700992; b_lsid=7717C5A8_19996AFA49B' \
-//   -H 'pragma: no-cache' \
-//   -H 'priority: u=0, i' \
-//   -H 'referer: https://search.bilibili.com/video?keyword=%E9%80%86%E5%90%91b%E7%AB%99%E8%A7%86%E9%A2%91playurl&from_source=webtop_search&spm_id_from=333.1007&search_source=5' \
-//   -H 'sec-ch-ua: "Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"' \
-//   -H 'sec-ch-ua-mobile: ?0' \
-//   -H 'sec-ch-ua-platform: "Windows"' \
-//   -H 'sec-fetch-dest: document' \
-//   -H 'sec-fetch-mode: navigate' \
-//   -H 'sec-fetch-site: same-origin' \
-//   -H 'sec-fetch-user: ?1' \
-//   -H 'upgrade-insecure-requests: 1' \
-//   -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
+if (!fs.existsSync(config.downloadDir)) {
+    {
+        fs.mkdirSync(config.downloadDir);
+    }
+}
+// ==================== Functions ====================
 function cli() {
     var _this = this;
     try {
-        rl.question('Enter the video URL (or q/quit to exit): ', function (url) { return __awaiter(_this, void 0, void 0, function () {
-            var trimmed;
+        rl.question('Enter the video/collection URL (or q/quit to exit): ', function (url) { return __awaiter(_this, void 0, void 0, function () {
+            var trimmed, error_1;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
                         trimmed = url.trim().toLowerCase();
                         if (trimmed === 'q' || trimmed === 'quit') {
-                            console.log('Bye!');
-                            rl.close();
+                            log(chalk.green('Bye!'));
+                            cleanup();
+                            process.exit(0);
                             return [2 /*return*/];
                         }
-                        if (!(trimmed === '' || trimmed === 'enter')) return [3 /*break*/, 3];
-                        return [4 /*yield*/, getHtml()];
+                        if (!(url.includes('bilibili') || url.includes('bv'))) return [3 /*break*/, 5];
+                        _a.label = 1;
                     case 1:
-                        _a.sent();
-                        return [4 /*yield*/, readHtml()];
+                        _a.trys.push([1, 4, , 5]);
+                        videoInfo.bvid = extractBVID(url);
+                        log(chalk.blue("Extracted BVID: ".concat(videoInfo.bvid)));
+                        return [4 /*yield*/, getBVHtml(url)];
                     case 2:
                         _a.sent();
-                        console.log('✅ Done! Enter another URL or q to quit.\n');
-                        return [2 /*return*/, cli()];
+                        return [4 /*yield*/, downloadAudio()];
                     case 3:
-                        if (url.includes('bilibili') || url.includes('b23.tv')) {
-                            console.log('Bilibili downloader is not implemented yet.');
-                            return [2 /*return*/, cli()];
-                        }
+                        _a.sent();
+                        console.log('Done! Enter another URL or q to quit.\n');
+                        cleanup();
+                        return [2 /*return*/, cli()];
+                    case 4:
+                        error_1 = _a.sent();
+                        console.error(' Error during processing:', error_1);
+                        log('Please try again.\n');
+                        return [2 /*return*/, cli()];
+                    case 5:
+                        cleanup();
                         console.log('Invalid input, please re-enter.');
                         return [2 /*return*/, cli()];
                 }
@@ -120,63 +142,216 @@ function cli() {
     }
     catch (error) {
         console.error('⚠️ Error:', error);
-        console.log('Please try again.\n');
+        log('Please try again.\n');
         return cli();
     }
 }
-// read html file,extract json data and assign to audioArr and videoArr
-function readHtml() {
-    return __awaiter(this, void 0, void 0, function () {
-        var filePath, html;
-        return __generator(this, function (_a) {
-            filePath = path.join(__dirname, 'test.html');
-            html = fs.readFileSync(filePath, 'utf-8');
-            //console.log(html);
-            extractJsonFromHtml(html);
-            return [2 /*return*/];
-        });
+//==================== Manage cookies ====================
+function loadCookies() {
+    try {
+        // if yes, load cookies from file
+        if (fs.existsSync(config.cookieFile)) {
+            var cookie = fs.readFileSync(config.cookieFile, 'utf-8').trim();
+            if (cookie) {
+                log(chalk.green('Cookies loaded from file.'));
+                config.headers.cookie = cookie;
+                return true;
+            }
+        }
+    }
+    catch (error) {
+        log(chalk.red('No cookies file found, proceeding without cookies.'));
+        return false;
+    }
+}
+function setupCookie() {
+    log(chalk.yellow('No cookies found. Please enter your Bilibili cookies to proceed.'));
+    log(chalk.gray('(You can get it from browser DevTools -> Application -> Cookies)\n'));
+    rl.question('Enter your cookies: ', function (inputCookie) {
+        if (!inputCookie.trim()) {
+            log(chalk.red('Cookie cannot be empty!'));
+            promptRetry();
+            return;
+        }
+        if (inputCookie.trim()) {
+            if (!validateCookie(inputCookie)) {
+                promptRetry();
+                return;
+            }
+            config.headers.cookie = inputCookie.trim();
+            //save cookies to file
+            fs.writeFileSync(config.cookieFile, inputCookie.trim(), 'utf-8');
+            log(chalk.green('Cookies saved successfully.\n'));
+            cli();
+        }
     });
 }
-function getHtml() {
+function validateCookie(cookie) {
+    if (!cookie || cookie.length < 100) {
+        log(chalk.yellow('⚠️  Cookie seems too short (less than 100 characters)'));
+        return false;
+    }
+    if (!cookie.includes(';')) {
+        log(chalk.yellow('⚠️  Cookie should contain semicolons (;)'));
+        return false;
+    }
+    if (!cookie.includes('buvid4')) {
+        log(chalk.yellow('⚠️  Cookie seems to be missing key fields'));
+        return false;
+    }
+    return true;
+}
+function promptRetry() {
+    rl.question('Do you want to re-enter cookies? (y/n): ', function (answer) {
+        var trimmed = answer.trim().toLowerCase();
+        if (trimmed === 'y' || trimmed === 'yes') {
+            setupCookie();
+        }
+        else {
+            log(chalk.red('Cannot proceed without valid cookies. Exiting.'));
+            cleanup();
+            process.exit(1);
+        }
+    });
+}
+//==================== Download Module ====================
+function getBVHtml(url) {
     return __awaiter(this, void 0, void 0, function () {
         var response;
         return __generator(this, function (_a) {
             switch (_a.label) {
-                case 0: return [4 /*yield*/, axios_1.default.get('https://www.bilibili.com/video/BV1yyN1eMEgj/', {
-                        params: {
-                            'spm_id_from': '333.337.search-card.all.click',
-                            'vd_source': '020f49bde169054c895cbefa73c9d6ca'
-                        },
-                        headers: headers
+                case 0: return [4 /*yield*/, axios_1.default.get(url, {
+                        headers: config.headers
                     })];
                 case 1:
                     response = _a.sent();
                     //console.log(response.data);
-                    fs.writeFileSync('./test.html', response.data, 'utf-8');
+                    extractJsonFromHtml(response.data);
                     return [2 /*return*/];
             }
         });
     });
+}
+function getSeasonHtml(url) {
+    return __awaiter(this, void 0, void 0, function () {
+        var seasonBaseUrl, fetchUrl, response;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    seasonBaseUrl = ' https://api.bilibili.com/x/polymer/web-space/seasons_archives_list?';
+                    fetchUrl = "".concat(seasonBaseUrl, "season_id=SEASON_ID&page_num=PAGE_NUM&page_size=PAGE_SIZE");
+                    return [4 /*yield*/, axios_1.default.get(url, {
+                            headers: config.headers
+                        })];
+                case 1:
+                    response = _a.sent();
+                    return [2 /*return*/];
+            }
+        });
+    });
+}
+function extractBVID(url) {
+    var bvidMatch = url.match(/BV[0-9A-Za-z]+/);
+    if (bvidMatch) {
+        return bvidMatch[0];
+    }
 }
 function extractJsonFromHtml(html) {
     var regrex = /window\.__playinfo__\s*=\s*(\{.*?\})\s*<\/script>/;
     var match = html.match(regrex);
     if (match && match[1]) {
         var playinfoJson = JSON.parse(match[1]);
+        //using filter for audioarr and videoarr
+        var filePath = path.join(config.downloadDir, 'playinfo.json');
         audioArr = playinfoJson.data.dash.audio;
         videoArr = playinfoJson.data.dash.video;
         dolby = playinfoJson.data.dash.dolby;
-        console.log('Extracted JSON:', audioArr);
+        videoInfo.title = html.match(/<title[^>]*>([^<]+)<\/title>/)[1].trim();
+        videoInfo.author = html.match(/<meta[^>]*name="author"[^>]*content="([^"]*)"/)[1];
+        videoInfo.description = html.match(/<meta[^>]*name="description"[^>]*content="([^"]*)"/)[1].replace(/\s*[，,]\s*相关视频[:：]?\s*.*$/, '').trim();
+        log(chalk.green("Video Title: ".concat(videoInfo.title)));
+        log(chalk.green("Author: ".concat(videoInfo.author)));
+        log(chalk.green("BVID: ".concat(videoInfo.bvid)));
+        log(chalk.green("Description: ".concat(videoInfo.description)));
+        fs.writeFileSync('./playinfo.json', JSON.stringify({
+            audioArr: audioArr,
+            videoArr: videoArr,
+            dolby: dolby
+        }, null, 4), 'utf-8');
     }
 }
+function downloadAudio() {
+    return __awaiter(this, void 0, void 0, function () {
+        var len, bestAudio, urlsToDownload, _i, urlsToDownload_1, url, res;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    len = audioArr.length;
+                    if (audioArr.length === 0) {
+                        log(chalk.red('No audio streams found to download.'));
+                        return [2 /*return*/];
+                    }
+                    if (!(audioArr.length >= 1)) return [3 /*break*/, 4];
+                    log(chalk.yellow("Multiple audio streams found (".concat(len, "). Downloading the highest quality one.")));
+                    // use sort to get the highest quality audio at this time
+                    audioArr.sort(function (a, b) { return b.bandwidth - a.bandwidth; });
+                    bestAudio = audioArr[0];
+                    urlsToDownload = __spreadArray(__spreadArray([bestAudio.baseUrl, bestAudio.base_url], bestAudio.backupUrl, true), bestAudio.backup_url, true);
+                    _i = 0, urlsToDownload_1 = urlsToDownload;
+                    _a.label = 1;
+                case 1:
+                    if (!(_i < urlsToDownload_1.length)) return [3 /*break*/, 4];
+                    url = urlsToDownload_1[_i];
+                    if (!url)
+                        return [3 /*break*/, 3];
+                    log(chalk.blue("Downloading audio from URL: ".concat(url)));
+                    return [4 /*yield*/, axios_1.default.get(url, {
+                            headers: config.headers,
+                            responseType: 'arraybuffer',
+                        })];
+                case 2:
+                    res = _a.sent();
+                    if (res.status != 200) {
+                        log(chalk.yellow("Warning: Received status code ".concat(res.status, " when trying to download audio.\nTries next URL...")));
+                        return [3 /*break*/, 3];
+                    }
+                    if (!res.data || res.data.byteLength === 0) {
+                        log(chalk.yellow('Warning: Empty response data. Trying next URL...'));
+                        return [3 /*break*/, 3];
+                    }
+                    fs.writeFileSync(path.join(config.downloadDir, "".concat(videoInfo.title, ".flac")), Buffer.from(res.data));
+                    console.log('✅ finished');
+                    return [2 /*return*/];
+                case 3:
+                    _i++;
+                    return [3 /*break*/, 1];
+                case 4: return [2 /*return*/];
+            }
+        });
+    });
+}
+function cleanup() {
+    if (!rl.close) {
+        rl.close();
+    }
+}
+// welcome message
+var welcomeMessage = function () { return console.log("\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n\u2551 \u2661  Welcome to Bilibili Downloader \u2661  \u2551\n\u2551          ~ Let's start!              \u2551\n\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n"); };
 // Bilibili downloader
 function main() {
     return __awaiter(this, void 0, void 0, function () {
+        var hasCookie;
         return __generator(this, function (_a) {
-            console.log("\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n\u2551     \u2661  Welcome to Downloader \u2661       \u2551\n\u2551          \u55B5~ Let's start! \uD83D\uDC3E          \u2551\n\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n");
-            cli();
+            hasCookie = loadCookies();
+            if (!hasCookie) {
+                setupCookie();
+            }
+            else {
+                cli();
+            }
             return [2 /*return*/];
         });
     });
 }
 main();
+extractBVID('https://www.bilibili.com/video/BV18nxfzPESy/');
