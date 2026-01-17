@@ -1,12 +1,8 @@
-
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
-
-
 import * as readline from 'readline';
 import * as chalk from 'chalk';
-
 
 interface VideoInfo {
 	title: string;
@@ -15,29 +11,82 @@ interface VideoInfo {
 	uploadDate: string;
 	bvid: string;
 }
-// Initialize videoInfo with empty strings
-let videoInfo: VideoInfo = {
-	title: '',
-	author: '',
-	description: '',
-	uploadDate: '',
-	bvid: ''
-};
+
+interface AudioStream {
+	baseUrl?: string;
+	base_url?: string;
+	backupUrl?: string[];
+	backup_url?: string[];
+	bandwidth: number;
+}
+
+interface VideoData {
+	audioArr: AudioStream[];
+	videoArr: any[];
+	dolby: any[];
+	videoInfo: VideoInfo;
+}
+
+interface SeasonArchive {
+	aid: number;
+	bvid: string;
+	ctime: number;
+	duration: number;
+	title: string;
+	pic: string;
+	pubdate: number;
+	stat: {
+		view: number;
+		vt: number;
+		danmaku: number;
+	};
+	state: number;
+	ugc_pay: number;
+	vt_display: string;
+	is_lesson_video: number;
+}
+
+interface SeasonMeta {
+	category: number;
+	cover: string;
+	description: string;
+	mid: number;
+	name: string;
+	ptime: number;
+	season_id: number;
+	total: number;
+	title: string;
+}
+
+interface SeasonResponse {
+	code: number;
+	message: string;
+	ttl: number;
+	data: {
+		aids: number[];
+		archives: SeasonArchive[];
+		meta: SeasonMeta;
+		page: {
+			page_num: number;
+			page_size: number;
+			total: number;
+		};
+	};
+}
+
+interface Config {
+	downloadDir: string;
+	cookieFile: string;
+	headers: {
+		[key: string]: string;
+	};
+}
 
 const log = console.log;
 log('Downloader module loaded');
 
-const rl = readline.createInterface({
-	input: process.stdin,
-	output: process.stdout
-})
-
-
-
-// ==================== Config ====================
-const config = {
-
-	//create downloads directory if not exists
+// ==================== Config (只保留配置相关的全局变量) ====================
+const config: Config = {
 	downloadDir: path.join(__dirname, "downloads"),
 	cookieFile: path.join(__dirname, 'cookies.txt'),
 	headers: {
@@ -58,62 +107,16 @@ const config = {
 		'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
 		'cookie': ''
 	}
-}
+};
 
-let audioArr = []
-let videoArr = []
-let dolby = []
-
+// 确保下载目录存在
 if (!fs.existsSync(config.downloadDir)) {
-	{
-		fs.mkdirSync(config.downloadDir);
-	}
-}
-// ==================== Functions ====================
-function cli() {
-	try {
-		rl.question('Enter the video/collection URL (or q/quit to exit): ', async (url) => {
-			const trimmed = url.trim().toLowerCase();
-			if (trimmed === 'q' || trimmed === 'quit') {
-				log(chalk.green('Bye!'));
-				cleanup();
-				process.exit(0);
-				return;
-			}
-
-			if (url.includes('bilibili') || url.includes('bv')) {
-				try {
-					videoInfo.bvid = extractBVID(url);
-					log(chalk.blue(`Extracted BVID: ${videoInfo.bvid}`));
-					await getBVHtml(url);
-
-					await downloadAudio();
-					console.log('Done! Enter another URL or q to quit.\n');
-					cleanup();
-					return cli();
-				} catch (error) {
-					console.error(' Error during processing:', error);
-					log('Please try again.\n');
-					return cli();
-				}
-			}
-			cleanup();
-			console.log('Invalid input, please re-enter.');
-			return cli();
-		});
-	} catch (error) {
-		console.error('⚠️ Error:', error);
-		log('Please try again.\n');
-		return cli();
-	}
-
+	fs.mkdirSync(config.downloadDir);
 }
 
-//==================== Manage cookies ====================
-
+// ==================== Cookie 管理 ====================
 function loadCookies(): boolean {
 	try {
-		// if yes, load cookies from file
 		if (fs.existsSync(config.cookieFile)) {
 			const cookie = fs.readFileSync(config.cookieFile, 'utf-8').trim();
 			if (cookie) {
@@ -122,35 +125,12 @@ function loadCookies(): boolean {
 				return true;
 			}
 		}
-	} catch (error) {
+	} catch (error: any) {
 		log(chalk.red('No cookies file found, proceeding without cookies.'));
-		return false;
 	}
+	return false;
 }
 
-function setupCookie() {
-	log(chalk.yellow('No cookies found. Please enter your Bilibili cookies to proceed.'));
-	log(chalk.gray('(You can get it from browser DevTools -> Application -> Cookies)\n'));
-	rl.question('Enter your cookies: ', (inputCookie) => {
-		if (!inputCookie.trim()) {
-			log(chalk.red('Cookie cannot be empty!'));
-			promptRetry();
-			return;
-		}
-		if (inputCookie.trim()) {
-
-			if (!validateCookie(inputCookie)) {
-				promptRetry();
-				return
-			}
-			config.headers.cookie = inputCookie.trim();
-			//save cookies to file
-			fs.writeFileSync(config.cookieFile, inputCookie.trim(), 'utf-8');
-			log(chalk.green('Cookies saved successfully.\n'));
-			cli();
-		}
-	})
-}
 function validateCookie(cookie: string): boolean {
 	if (!cookie || cookie.length < 100) {
 		log(chalk.yellow('⚠️  Cookie seems too short (less than 100 characters)'));
@@ -164,153 +144,639 @@ function validateCookie(cookie: string): boolean {
 		log(chalk.yellow('⚠️  Cookie seems to be missing key fields'));
 		return false;
 	}
-
-	return true
+	return true;
 }
 
-function promptRetry() {
-	rl.question('Do you want to re-enter cookies? (y/n): ', (answer) => {
-		const trimmed = answer.trim().toLowerCase();
-		if (trimmed === 'y' || trimmed === 'yes') {
-			setupCookie();
-		} else {
-			log(chalk.red('Cannot proceed without valid cookies. Exiting.'));
-			cleanup();
-			process.exit(1);
-		}
-	})
-}
+function setupCookie(rl: readline.Interface): Promise<void> {
+	return new Promise((resolve) => {
+		log(chalk.yellow('No cookies found. Please enter your Bilibili cookies to proceed.'));
+		log(chalk.gray('(You can get it from browser DevTools -> Application -> Cookies)\n'));
 
-//==================== Download Module ====================
-async function getBVHtml(url: string) {
-	//1. url is a simple video url
+		const askForCookie = () => {
+			rl.question('Enter your cookies: ', (inputCookie) => {
+				if (!inputCookie.trim()) {
+					log(chalk.red('Cookie cannot be empty!'));
+					promptRetry();
+					return;
+				}
 
-	const response = await axios.get(url, {
-		headers: config.headers
+				if (!validateCookie(inputCookie)) {
+					promptRetry();
+					return;
+				}
+
+				config.headers.cookie = inputCookie.trim();
+				fs.writeFileSync(config.cookieFile, inputCookie.trim(), 'utf-8');
+				log(chalk.green('Cookies saved successfully.\n'));
+				resolve();
+			});
+		};
+
+		const promptRetry = () => {
+			rl.question('Do you want to re-enter cookies? (y/n): ', (answer) => {
+				const trimmed = answer.trim().toLowerCase();
+				if (trimmed === 'y' || trimmed === 'yes') {
+					askForCookie();
+				} else {
+					log(chalk.red('Cannot proceed without valid cookies. Exiting.'));
+					rl.close();
+					process.exit(1);
+				}
+			});
+		};
+
+		askForCookie();
 	});
-	//console.log(response.data);
-	extractJsonFromHtml(response.data);
-	//fs.writeFileSync(path.join(downloadDir, 'test.html'), response.data, 'utf-8');
 }
 
-async function getSeasonHtml(url: string) {
-	//2. url is a season url
-	// url example: 
-	// https://api.bilibili.com/x/polymer/web-space/seasons_archives_list?season_id=2209693&page_num=2&page_size=100
-	// @season_id,page_size,page_num are required parameters
-	const seasonBaseUrl = ' https://api.bilibili.com/x/polymer/web-space/seasons_archives_list?'
-	const fetchUrl = `${seasonBaseUrl}season_id=SEASON_ID&page_num=PAGE_NUM&page_size=PAGE_SIZE`;
-	const response = await axios.get(url, {
-		headers: config.headers
-	});
-	//console.log(response.data);
+// ==================== URL 解析 ====================
+function isSeasonUrl(url: string): boolean {
+	return url.includes('seasons_archives_list');
 }
 
-function extractBVID(url: string): string {
+function extractBVID(url: string): string | null {
 	const bvidMatch = url.match(/BV[0-9A-Za-z]+/);
-	if (bvidMatch) {
-		return bvidMatch[0];
-	}
+	return bvidMatch ? bvidMatch[0] : null;
 }
-function extractJsonFromHtml(html: string): any | null {
-	const regrex = /window\.__playinfo__\s*=\s*(\{.*?\})\s*<\/script>/;
-	const match = html.match(regrex);
-	if (match && match[1]) {
+
+function extractSeasonId(url: string): string | null {
+	// 方式1: 从API URL中提取 (原有方式)
+	// https://api.bilibili.com/x/polymer/web-space/seasons_archives_list?season_id=2209693&...
+	let seasonIdMatch = url.match(/season_id=(\d+)/);
+	if (seasonIdMatch) {
+		return seasonIdMatch[1];
+	}
+
+	// 方式2: 从用户空间合集URL中提取
+	// https://space.bilibili.com/1060544882/lists/1049571?type=season
+	// https://space.bilibili.com/xxx/lists/SEASON_ID
+	seasonIdMatch = url.match(/\/lists\/(\d+)/);
+	if (seasonIdMatch) {
+		return seasonIdMatch[1];
+	}
+
+	return null;
+}
+
+// ==================== 文件名处理 ====================
+function sanitizeFilename(filename: string): string {
+	// 移除或替换Windows/Linux文件系统中的非法字符
+	return filename
+		.replace(/[<>:"/\\|?*]/g, '') // 移除非法字符
+		.replace(/\s+/g, ' ') // 多个空格替换为单个
+		.trim()
+		.substring(0, 200); // 限制长度，避免过长
+}
+
+function generateFilename(videoInfo: VideoInfo, extension: string): string {
+	const title = sanitizeFilename(videoInfo.title);
+	const author = sanitizeFilename(videoInfo.author);
+	return `${title} - ${author}.${extension}`;
+}
+
+// ==================== HTML/数据获取 ====================
+async function fetchVideoHtml(url: string): Promise<string> {
+	const response = await axios.get(url, {
+		headers: config.headers
+	});
+	return response.data;
+}
+
+async function fetchSeasonData(url: string): Promise<SeasonResponse> {
+	const response = await axios.get(url, {
+		headers: config.headers
+	});
+	return response.data;
+}
+
+// ==================== 数据提取 ====================
+function extractVideoDataFromHtml(html: string, bvid: string): VideoData | null {
+	const regex = /window\.__playinfo__\s*=\s*(\{.*?\})\s*<\/script>/;
+	const match = html.match(regex);
+
+	if (!match || !match[1]) {
+		log(chalk.red('Failed to extract playinfo from HTML'));
+		return null;
+	}
+
+	try {
 		const playinfoJson = JSON.parse(match[1]);
-		//using filter for audioarr and videoarr
-		const filePath = path.join(config.downloadDir, 'playinfo.json');
 
-		audioArr = playinfoJson.data.dash.audio;
-		videoArr = playinfoJson.data.dash.video;
-		dolby = playinfoJson.data.dash.dolby;
-		videoInfo.title = html.match(/<title[^>]*>([^<]+)<\/title>/)[1].trim();
-		videoInfo.author = html.match(/<meta[^>]*name="author"[^>]*content="([^"]*)"/)[1];
-		videoInfo.description = html.match(/<meta[^>]*name="description"[^>]*content="([^"]*)"/)[1].replace(/\s*[，,]\s*相关视频[:：]?\s*.*$/, '').trim();
-		log(chalk.green(`Video Title: ${videoInfo.title}`));
-		log(chalk.green(`Author: ${videoInfo.author}`));
-		log(chalk.green(`BVID: ${videoInfo.bvid}`));
-		log(chalk.green(`Description: ${videoInfo.description}`));
-		fs.writeFileSync('./playinfo.json', JSON.stringify({
-			audioArr,
-			videoArr,
-			dolby
-		}, null, 4), 'utf-8');
+		// 提取视频信息
+		const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/);
+		const authorMatch = html.match(/<meta[^>]*name="author"[^>]*content="([^"]*)"/);
+		const descMatch = html.match(/<meta[^>]*name="description"[^>]*content="([^"]*)"/);
 
+		// 清理标题：移除 "_哔哩哔哩_bilibili" 等后缀
+		let cleanTitle = titleMatch ? titleMatch[1].trim() : 'Unknown';
+		cleanTitle = cleanTitle
+			.replace(/_哔哩哔哩_bilibili$/i, '')
+			.replace(/ - 哔哩哔哩$/i, '')
+			.replace(/\s+$/, '')
+			.trim();
+
+		const videoInfo: VideoInfo = {
+			title: cleanTitle,
+			author: authorMatch ? authorMatch[1] : 'Unknown',
+			description: descMatch ? descMatch[1].replace(/\s*[，,]\s*相关视频[:：]?\s*.*$/, '').trim() : '',
+			uploadDate: '',
+			bvid: bvid
+		};
+
+		const videoData: VideoData = {
+			audioArr: playinfoJson.data.dash.audio || [],
+			videoArr: playinfoJson.data.dash.video || [],
+			dolby: playinfoJson.data.dash.dolby || [],
+			videoInfo: videoInfo
+		};
+
+		// 可选：保存调试信息
+		fs.writeFileSync(
+			path.join(config.downloadDir, 'playinfo.json'),
+			JSON.stringify(videoData, null, 4),
+			'utf-8'
+		);
+
+		return videoData;
+	} catch (error) {
+		log(chalk.red('Failed to parse playinfo JSON:', error));
+		return null;
 	}
-
 }
 
-async function downloadAudio() {
-
-	const len = audioArr.length;
-	if (audioArr.length === 0) {
+// ==================== 下载功能 ====================
+async function downloadAudioToFolder(
+	audioStreams: AudioStream[],
+	videoInfo: VideoInfo,
+	targetFolder: string
+): Promise<boolean> {
+	if (audioStreams.length === 0) {
 		log(chalk.red('No audio streams found to download.'));
-		return;
+		return false;
 	}
-	if (audioArr.length >= 1) {
-		log(chalk.yellow(`Multiple audio streams found (${len}). Downloading the highest quality one.`));
 
-		// use sort to get the highest quality audio at this time
-		audioArr.sort((a, b) => b.bandwidth - a.bandwidth);
-		const bestAudio = audioArr[0];
-		const urlsToDownload = [bestAudio.baseUrl, bestAudio.base_url, ...bestAudio.backupUrl, ...bestAudio.backup_url];
-		for (const url of urlsToDownload) {
-			if (!url) continue;
-			log(chalk.blue(`Downloading audio from URL: ${url}`));
+	log(chalk.yellow(`Found ${audioStreams.length} audio stream(s). Downloading the highest quality one.`));
+
+	// 按带宽排序,选择最高质量
+	const sortedStreams = [...audioStreams].sort((a, b) => b.bandwidth - a.bandwidth);
+	const bestAudio = sortedStreams[0];
+
+	// 收集所有可能的URL (过滤掉 undefined/null)
+	const urlsToDownload = [
+		bestAudio.baseUrl,
+		bestAudio.base_url,
+		...(bestAudio.backupUrl || []),
+		...(bestAudio.backup_url || [])
+	].filter((url): url is string => !!url); // 类型守卫：确保过滤后都是 string
+
+	// 尝试每个URL直到成功
+	for (const url of urlsToDownload) {
+		try {
+			log(chalk.blue(`Downloading audio from URL: ${url.substring(0, 80)}...`));
 
 			const res = await axios.get(url, {
 				headers: config.headers,
 				responseType: 'arraybuffer',
-
 			});
 
-			if (res.status != 200) {
-				log(chalk.yellow(`Warning: Received status code ${res.status} when trying to download audio.\nTries next URL...`));
+			if (res.status !== 200) {
+				log(chalk.yellow(`Warning: Received status code ${res.status}. Trying next URL...`));
 				continue;
 			}
+
 			if (!res.data || res.data.byteLength === 0) {
 				log(chalk.yellow('Warning: Empty response data. Trying next URL...'));
 				continue;
 			}
 
-			fs.writeFileSync(path.join(config.downloadDir, `${videoInfo.title}.flac`), Buffer.from(res.data))
-			console.log('✅ finished');
-			return;
+			// 下载成功,保存文件
+			const filename = generateFilename(videoInfo, 'flac');
+			const filepath = path.join(targetFolder, filename);
+			fs.writeFileSync(filepath, Buffer.from(res.data));
+			log(chalk.green(`✅ Download finished: ${filename}`));
+			return true;
+		} catch (error: any) {
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			log(chalk.yellow(`Error downloading from ${url.substring(0, 50)}...: ${errorMsg}`));
+			log(chalk.yellow('Trying next URL...'));
+			continue;
+		}
+	}
+
+	log(chalk.red('❌ Failed to download audio from all available URLs.'));
+	return false;
+}
+
+async function downloadAudioStream(audioStreams: AudioStream[], videoInfo: VideoInfo): Promise<boolean> {
+	return downloadAudioToFolder(audioStreams, videoInfo, config.downloadDir);
+}
+
+// ==================== 合集列表获取 ====================
+async function fetchAllSeasonArchives(seasonId: string): Promise<{ archives: SeasonArchive[], meta: SeasonMeta } | null> {
+	try {
+		const allArchives: SeasonArchive[] = [];
+		let pageNum = 1;
+		const pageSize = 100; // 每页获取100个
+		let meta: SeasonMeta | null = null;
+
+		log(chalk.blue('Fetching season data...'));
+
+		while (true) {
+			const url = `https://api.bilibili.com/x/polymer/web-space/seasons_archives_list?season_id=${seasonId}&page_size=${pageSize}&page_num=${pageNum}`;
+			const response = await fetchSeasonData(url);
+
+			if (response.code !== 0) {
+				log(chalk.red(`API Error: ${response.message}`));
+				return null;
+			}
+
+			// 保存 meta 信息
+			if (!meta) {
+				meta = response.data.meta;
+			}
+
+			// 如果没有数据了，退出循环
+			if (response.data.archives.length === 0) {
+				break;
+			}
+
+			allArchives.push(...response.data.archives);
+			log(chalk.gray(`Fetched page ${pageNum}, total: ${allArchives.length}/${meta.total}`));
+
+			// 如果已经获取了所有视频，退出
+			if (allArchives.length >= meta.total) {
+				break;
+			}
+
+			pageNum++;
+
+			// 稍微延迟，避免请求过快
+			await new Promise(resolve => setTimeout(resolve, 300));
 		}
 
+		log(chalk.green(`✅ Fetched ${allArchives.length} videos from season\n`));
+		return { archives: allArchives, meta: meta! };
 
-
-
+	} catch (error: any) {
+		const errorMsg = error instanceof Error ? error.message : String(error);
+		log(chalk.red('Error fetching season archives:', errorMsg));
+		return null;
 	}
 }
 
-function cleanup() {
-	if (!rl.close) {
-		rl.close();
+// ==================== 合集预览 ====================
+async function previewSeasonArchives(archives: SeasonArchive[], meta: SeasonMeta, rl: readline.Interface): Promise<void> {
+	return new Promise((resolve) => {
+		const itemsPerPage = 10;
+		let currentPage = 0;
+		const totalPages = Math.ceil(archives.length / itemsPerPage);
+
+		const displayPage = () => {
+			console.clear();
+			log(chalk.bold.cyan(`\n=== ${meta.title} ===`));
+			log(chalk.gray(`Total: ${meta.total} videos | Page ${currentPage + 1}/${totalPages}\n`));
+
+			const startIdx = currentPage * itemsPerPage;
+			const endIdx = Math.min(startIdx + itemsPerPage, archives.length);
+
+			for (let i = startIdx; i < endIdx; i++) {
+				const archive = archives[i];
+				log(chalk.white(`${i + 1}. `) + chalk.green(archive.title));
+				log(chalk.gray(`   BVID: ${archive.bvid} | Duration: ${archive.duration}s | Views: ${archive.stat.view}\n`));
+			}
+
+			log(chalk.yellow('\nControls:'));
+			log(chalk.gray('  [A] or [←] Previous page'));
+			log(chalk.gray('  [D] or [→] Next page'));
+			log(chalk.gray('  [ESC] Return to menu\n'));
+		};
+
+		displayPage();
+
+		// 暂停 readline，启用 raw mode
+		rl.pause();
+		if (process.stdin.isTTY) {
+			process.stdin.setRawMode(true);
+		}
+		process.stdin.resume();
+		process.stdin.setEncoding('utf8');
+
+		const onKeyPress = (key: string) => {
+			// ESC 键 (ASCII 27)
+			if (key === '\u001b') {
+				cleanup();
+				resolve();
+				return;
+			}
+
+			// Ctrl+C
+			if (key === '\u0003') {
+				cleanup();
+				process.exit(0);
+			}
+
+			// 左箭头或 'a'
+			if (key === '\u001b[D' || key.toLowerCase() === 'a') {
+				if (currentPage > 0) {
+					currentPage--;
+					displayPage();
+				}
+			}
+
+			// 右箭头或 'd'
+			if (key === '\u001b[C' || key.toLowerCase() === 'd') {
+				if (currentPage < totalPages - 1) {
+					currentPage++;
+					displayPage();
+				}
+			}
+		};
+
+		const cleanup = () => {
+			process.stdin.removeListener('data', onKeyPress);
+			if (process.stdin.isTTY) {
+				process.stdin.setRawMode(false);
+			}
+			process.stdin.pause();
+			// 恢复 readline
+			rl.resume();
+		};
+
+		process.stdin.on('data', onKeyPress);
+	});
+}
+
+// ==================== 合集下载菜单 ====================
+async function showSeasonMenu(archives: SeasonArchive[], meta: SeasonMeta, rl: readline.Interface): Promise<'preview' | 'download' | 'cancel'> {
+	return new Promise((resolve) => {
+		console.clear();
+		log(chalk.bold.cyan(`\n=== ${meta.title} ===`));
+		log(chalk.green(`Total videos: ${meta.total}\n`));
+		log(chalk.yellow('What would you like to do?'));
+		log(chalk.white('  [1] Preview list'));
+		log(chalk.white('  [2] Download all'));
+		log(chalk.white('  [ESC] Cancel\n'));
+
+		// 暂停 readline，启用 raw mode
+		rl.pause();
+		if (process.stdin.isTTY) {
+			process.stdin.setRawMode(true);
+		}
+		process.stdin.resume();
+		process.stdin.setEncoding('utf8');
+
+		const onKeyPress = (key: string) => {
+			cleanup();
+
+			if (key === '1') {
+				resolve('preview');
+			} else if (key === '2') {
+				resolve('download');
+			} else if (key === '\u001b') { // ESC
+				resolve('cancel');
+			} else if (key === '\u0003') { // Ctrl+C
+				process.exit(0);
+			}
+		};
+
+		const cleanup = () => {
+			process.stdin.removeListener('data', onKeyPress);
+			if (process.stdin.isTTY) {
+				process.stdin.setRawMode(false);
+			}
+			process.stdin.pause();
+			// 恢复 readline
+			rl.resume();
+		};
+
+		process.stdin.on('data', onKeyPress);
+	});
+}
+async function downloadSingleVideo(url: string): Promise<boolean> {
+	try {
+		// 1. 提取BVID
+		const bvid = extractBVID(url);
+		if (!bvid) {
+			log(chalk.red('Failed to extract BVID from URL'));
+			return false;
+		}
+		log(chalk.blue(`Extracted BVID: ${bvid}`));
+
+		// 2. 获取HTML
+		const html = await fetchVideoHtml(url);
+
+		// 3. 提取视频数据
+		const videoData = extractVideoDataFromHtml(html, bvid);
+		if (!videoData) {
+			return false;
+		}
+
+		// 4. 显示视频信息
+		log(chalk.green(`Video Title: ${videoData.videoInfo.title}`));
+		log(chalk.green(`Author: ${videoData.videoInfo.author}`));
+		log(chalk.green(`BVID: ${videoData.videoInfo.bvid}`));
+		log(chalk.green(`Description: ${videoData.videoInfo.description}`));
+
+		// 5. 下载音频
+		const success = await downloadAudioStream(videoData.audioArr, videoData.videoInfo);
+		return success;
+	} catch (error: any) {
+		const errorMsg = error instanceof Error ? error.message : String(error);
+		log(chalk.red('Error during video download:', errorMsg));
+		return false;
 	}
 }
-// welcome message
+
+// ==================== 合集下载 ====================
+async function downloadSeasonArchives(archives: SeasonArchive[], meta: SeasonMeta): Promise<boolean> {
+	try {
+		log(chalk.green(`\n=== Starting download: ${meta.title} ===`));
+		log(chalk.green(`Total videos: ${archives.length}\n`));
+
+		// 创建合集文件夹
+		const seasonFolderName = sanitizeFilename(meta.title);
+		const seasonFolder = path.join(config.downloadDir, seasonFolderName);
+
+		if (!fs.existsSync(seasonFolder)) {
+			fs.mkdirSync(seasonFolder, { recursive: true });
+			log(chalk.blue(`Created folder: ${seasonFolderName}\n`));
+		}
+
+		// 下载每个视频
+		let successCount = 0;
+		for (let i = 0; i < archives.length; i++) {
+			const archive = archives[i];
+			log(chalk.cyan(`\n[${i + 1}/${archives.length}] ${archive.title}`));
+			log(chalk.cyan(`BVID: ${archive.bvid}`));
+
+			try {
+				// 构建视频URL
+				const videoUrl = `https://www.bilibili.com/video/${archive.bvid}`;
+
+				// 获取视频数据
+				const html = await fetchVideoHtml(videoUrl);
+				const videoData = extractVideoDataFromHtml(html, archive.bvid);
+
+				if (!videoData) {
+					log(chalk.yellow(`⚠️ Failed to extract data for ${archive.bvid}`));
+					continue;
+				}
+
+				// 下载音频到合集文件夹
+				const downloaded = await downloadAudioToFolder(
+					videoData.audioArr,
+					videoData.videoInfo,
+					seasonFolder
+				);
+
+				if (downloaded) {
+					successCount++;
+				}
+
+				// 稍微延迟，避免请求过快
+				if (i < archives.length - 1) {
+					await new Promise(resolve => setTimeout(resolve, 1000));
+				}
+
+			} catch (error: any) {
+				const errorMsg = error instanceof Error ? error.message : String(error);
+				log(chalk.red(`❌ Error downloading ${archive.bvid}: ${errorMsg}`));
+			}
+		}
+
+		log(chalk.green(`\n✅ Season download complete: ${successCount}/${archives.length} successful`));
+		return successCount > 0;
+
+	} catch (error: any) {
+		const errorMsg = error instanceof Error ? error.message : String(error);
+		log(chalk.red('Error during season download:', errorMsg));
+		return false;
+	}
+}
+
+async function downloadSeason(url: string, rl: readline.Interface): Promise<boolean> {
+	try {
+		// 提取 season_id
+		const seasonId = extractSeasonId(url);
+		if (!seasonId) {
+			log(chalk.red('Failed to extract season ID from URL'));
+			return false;
+		}
+
+		// 获取整个合集的所有视频
+		const result = await fetchAllSeasonArchives(seasonId);
+		if (!result) {
+			return false;
+		}
+
+		const { archives, meta } = result;
+
+		// 显示菜单让用户选择
+		while (true) {
+			const choice = await showSeasonMenu(archives, meta, rl);
+
+			if (choice === 'cancel') {
+				log(chalk.yellow('\nCancelled.\n'));
+				return false;
+			}
+
+			if (choice === 'preview') {
+				await previewSeasonArchives(archives, meta, rl);
+				// 预览完后继续显示菜单
+				continue;
+			}
+
+			if (choice === 'download') {
+				return await downloadSeasonArchives(archives, meta);
+			}
+		}
+
+	} catch (error: any) {
+		const errorMsg = error instanceof Error ? error.message : String(error);
+		log(chalk.red('Error during season download:', errorMsg));
+		return false;
+	}
+}
+
+// ==================== CLI ====================
+async function cli(rl: readline.Interface): Promise<void> {
+	return new Promise((resolve) => {
+		rl.question('Enter the video/collection URL (or q/quit to exit): ', async (url) => {
+			const trimmed = url.trim().toLowerCase();
+
+			if (trimmed === 'q' || trimmed === 'quit') {
+				log(chalk.green('Bye!'));
+				rl.close();
+				process.exit(0);
+				return;
+			}
+
+			if (!url.includes('bilibili') && !url.includes('bv')) {
+				log(chalk.yellow('Invalid URL, please try again.\n'));
+				resolve();
+				return;
+			}
+
+			try {
+				let success = false;
+				// 判断是否为合集URL
+				if (url.includes('seasons_archives_list') || url.includes('/lists/')) {
+					// 合集URL (API格式或用户空间格式)
+					success = await downloadSeason(url, rl);
+				} else if (url.includes('bilibili.com/video/') || url.includes('BV')) {
+					// 单个视频URL
+					success = await downloadSingleVideo(url);
+				} else {
+					log(chalk.yellow('Unknown URL format. Please provide a valid Bilibili video or season URL.\n'));
+					resolve();
+					return;
+				}
+
+				if (success) {
+					log(chalk.green('\n✅ Done! Enter another URL or q to quit.\n'));
+				} else {
+					log(chalk.yellow('\n⚠️ Download failed. Please try again.\n'));
+				}
+			} catch (error: any) {
+				const errorMsg = error instanceof Error ? error.message : String(error);
+				log(chalk.red('Error during processing:', errorMsg));
+				log(chalk.yellow('Please try again.\n'));
+			}
+
+			resolve();
+		});
+	});
+}
+
+// ==================== 主程序 ====================
 const welcomeMessage = () => console.log(`
 ╔══════════════════════════════════════╗
-║ ♡  Welcome to Bilibili Downloader ♡  ║
+║ ♡  Welcome to BiliAudio Downloader ♡ ║
 ║          ~ Let's start!              ║
 ╚══════════════════════════════════════╝
 `);
-// Bilibili downloader
-async function main() {
-	//welcomeMessage();
 
-	//load cookies from file
+async function main() {
+	welcomeMessage();
+
+	const rl = readline.createInterface({
+		input: process.stdin,
+		output: process.stdout
+	});
+
+	// 加载或设置 cookies
 	const hasCookie = loadCookies();
 	if (!hasCookie) {
-		setupCookie()
-	}
-	else {
-		cli();
+		await setupCookie(rl);
 	}
 
-
+	// 主循环
+	while (true) {
+		await cli(rl);
+	}
 }
 
-main();
-extractBVID('https://www.bilibili.com/video/BV18nxfzPESy/')
+main().catch((error: any) => {
+	log(chalk.red('Fatal error:', error));
+	process.exit(1);
+});
