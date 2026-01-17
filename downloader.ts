@@ -4,6 +4,8 @@ import * as path from 'path';
 import * as readline from 'readline';
 import * as chalk from 'chalk';
 import { execSync } from 'child_process';
+import pLimit from 'p-limit';
+import cliProgress from 'cli-progress';
 
 // 动态导入 ffmpeg-static
 let ffmpegPath: string = 'ffmpeg';
@@ -93,6 +95,7 @@ interface Config {
 	audioFormat: 'flac' | 'mp3' | 'wav' | 'm4a'; // 目标音频格式
 	audioBitrate: string; // 音频比特率 (仅用于有损格式如mp3)
 	ffmpegPath: string; // FFmpeg 可执行文件路径
+	concurrency: number; // 并发下载数量
 }
 
 const log = console.log;
@@ -102,9 +105,10 @@ log('Downloader module loaded');
 const config: Config = {
 	downloadDir: path.join(__dirname, "downloads"),
 	cookieFile: path.join(__dirname, 'cookies.txt'),
-	audioFormat: 'mp3', // 默认转换为 m4a 音乐格式
+	audioFormat: 'mp3', // 默认转换为 FLAC 音乐格式
 	audioBitrate: '320k', // MP3 比特率
 	ffmpegPath: ffmpegPath || 'ffmpeg', // 使用打包的 ffmpeg，如果没有则使用系统的
+	concurrency: 3, // 同时下载 3 首歌
 	headers: {
 		'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
 		'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
@@ -679,11 +683,45 @@ async function downloadSingleVideo(url: string): Promise<boolean> {
 	}
 }
 
-// ==================== 合集下载 ====================
+// ==================== 单个视频下载（用于并发） ====================
+async function downloadSingleArchive(
+	archive: SeasonArchive,
+	seasonFolder: string,
+	index: number,
+	total: number
+): Promise<{ success: boolean, title: string }> {
+	try {
+		// 构建视频URL
+		const videoUrl = `https://www.bilibili.com/video/${archive.bvid}`;
+
+		// 获取视频数据
+		const html = await fetchVideoHtml(videoUrl);
+		const videoData = extractVideoDataFromHtml(html, archive.bvid);
+
+		if (!videoData) {
+			return { success: false, title: archive.title };
+		}
+
+		// 下载音频到合集文件夹
+		const downloaded = await downloadAudioToFolder(
+			videoData.audioArr,
+			videoData.videoInfo,
+			seasonFolder
+		);
+
+		return { success: downloaded, title: videoData.videoInfo.title };
+
+	} catch (error: any) {
+		return { success: false, title: archive.title };
+	}
+}
+
+// ==================== 合集下载（并发版本） ====================
 async function downloadSeasonArchives(archives: SeasonArchive[], meta: SeasonMeta): Promise<boolean> {
 	try {
 		log(chalk.green(`\n=== Starting download: ${meta.title} ===`));
-		log(chalk.green(`Total videos: ${archives.length}\n`));
+		log(chalk.green(`Total videos: ${archives.length}`));
+		log(chalk.cyan(`Concurrency: ${config.concurrency} simultaneous downloads\n`));
 
 		// 创建合集文件夹
 		const seasonFolderName = sanitizeFilename(meta.title);
@@ -694,49 +732,67 @@ async function downloadSeasonArchives(archives: SeasonArchive[], meta: SeasonMet
 			log(chalk.blue(`Created folder: ${seasonFolderName}\n`));
 		}
 
-		// 下载每个视频
+		// 创建进度条
+		const progressBar = new cliProgress.SingleBar({
+			format: chalk.cyan('{bar}') + ' | {percentage}% | {value}/{total} | Current: {current}',
+			barCompleteChar: '\u2588',
+			barIncompleteChar: '\u2591',
+			hideCursor: true
+		});
+
+		progressBar.start(archives.length, 0, {
+			current: 'Initializing...'
+		});
+
+		// 并发控制
+		const limit = pLimit(config.concurrency);
+		let completed = 0;
 		let successCount = 0;
-		for (let i = 0; i < archives.length; i++) {
-			const archive = archives[i];
-			log(chalk.cyan(`\n[${i + 1}/${archives.length}] ${archive.title}`));
-			log(chalk.cyan(`BVID: ${archive.bvid}`));
 
-			try {
-				// 构建视频URL
-				const videoUrl = `https://www.bilibili.com/video/${archive.bvid}`;
+		// 创建所有下载任务
+		const tasks = archives.map((archive, index) =>
+			limit(async () => {
+				// 更新进度条显示当前下载
+				progressBar.update(completed, {
+					current: chalk.yellow(archive.title.substring(0, 40) + '...')
+				});
 
-				// 获取视频数据
-				const html = await fetchVideoHtml(videoUrl);
-				const videoData = extractVideoDataFromHtml(html, archive.bvid);
+				// 下载
+				const result = await downloadSingleArchive(archive, seasonFolder, index + 1, archives.length);
 
-				if (!videoData) {
-					log(chalk.yellow(`⚠️ Failed to extract data for ${archive.bvid}`));
-					continue;
-				}
-
-				// 下载音频到合集文件夹
-				const downloaded = await downloadAudioToFolder(
-					videoData.audioArr,
-					videoData.videoInfo,
-					seasonFolder
-				);
-
-				if (downloaded) {
+				// 更新计数
+				completed++;
+				if (result.success) {
 					successCount++;
 				}
 
-				// 稍微延迟，避免请求过快
-				if (i < archives.length - 1) {
-					await new Promise(resolve => setTimeout(resolve, 1000));
-				}
+				// 更新进度条
+				progressBar.update(completed, {
+					current: result.success
+						? chalk.green(`✓ ${result.title.substring(0, 40)}`)
+						: chalk.red(`✗ ${result.title.substring(0, 40)}`)
+				});
 
-			} catch (error: any) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				log(chalk.red(`❌ Error downloading ${archive.bvid}: ${errorMsg}`));
-			}
+				return result;
+			})
+		);
+
+		// 等待所有任务完成
+		const results = await Promise.all(tasks);
+
+		// 停止进度条
+		progressBar.stop();
+
+		// 显示结果
+		log(chalk.green(`\n✅ Download complete: ${successCount}/${archives.length} successful`));
+
+		// 显示失败的
+		const failed = results.filter(r => !r.success);
+		if (failed.length > 0) {
+			log(chalk.red(`\n❌ Failed (${failed.length}):`));
+			failed.forEach(f => log(chalk.gray(`  - ${f.title}`)));
 		}
 
-		log(chalk.green(`\n✅ Season download complete: ${successCount}/${archives.length} successful`));
 		return successCount > 0;
 
 	} catch (error: any) {
