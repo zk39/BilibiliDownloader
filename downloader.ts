@@ -3,6 +3,16 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import * as chalk from 'chalk';
+import { execSync } from 'child_process';
+
+// 动态导入 ffmpeg-static
+let ffmpegPath: string = 'ffmpeg';
+try {
+	ffmpegPath = require('ffmpeg-static') as string;
+} catch (error) {
+	// 如果没有安装 ffmpeg-static，使用系统的 ffmpeg
+	ffmpegPath = 'ffmpeg';
+}
 
 interface VideoInfo {
 	title: string;
@@ -80,6 +90,9 @@ interface Config {
 	headers: {
 		[key: string]: string;
 	};
+	audioFormat: 'flac' | 'mp3' | 'wav' | 'm4a'; // 目标音频格式
+	audioBitrate: string; // 音频比特率 (仅用于有损格式如mp3)
+	ffmpegPath: string; // FFmpeg 可执行文件路径
 }
 
 const log = console.log;
@@ -89,6 +102,9 @@ log('Downloader module loaded');
 const config: Config = {
 	downloadDir: path.join(__dirname, "downloads"),
 	cookieFile: path.join(__dirname, 'cookies.txt'),
+	audioFormat: 'mp3', // 默认转换为 m4a 音乐格式
+	audioBitrate: '320k', // MP3 比特率
+	ffmpegPath: ffmpegPath || 'ffmpeg', // 使用打包的 ffmpeg，如果没有则使用系统的
 	headers: {
 		'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
 		'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
@@ -234,6 +250,60 @@ function generateFilename(videoInfo: VideoInfo, extension: string): string {
 	return `${title} - ${author}.${extension}`;
 }
 
+// ==================== 音频格式转换 ====================
+function convertAudioFormat(
+	inputPath: string,
+	outputPath: string,
+	format: 'flac' | 'mp3' | 'wav' | 'm4a',
+	bitrate?: string
+): boolean {
+	try {
+		log(chalk.blue(`Converting to ${format.toUpperCase()}...`));
+
+		// 如果是 m4a，直接复制不转换
+		if (format === 'm4a') {
+			fs.copyFileSync(inputPath, outputPath);
+			log(chalk.green(`✅ Saved as M4A`));
+			return true;
+		}
+
+		// 使用 ffmpeg-static 提供的路径，或回退到配置的路径
+		const ffmpegExe = ffmpegPath || config.ffmpegPath || 'ffmpeg';
+
+		let command = '';
+		switch (format) {
+			case 'flac':
+				command = `"${ffmpegExe}" -i "${inputPath}" -c:a flac -compression_level 8 "${outputPath}" -y`;
+				break;
+			case 'mp3':
+				command = `"${ffmpegExe}" -i "${inputPath}" -c:a libmp3lame -b:a ${bitrate || '320k'} "${outputPath}" -y`;
+				break;
+			case 'wav':
+				command = `"${ffmpegExe}" -i "${inputPath}" -c:a pcm_s16le "${outputPath}" -y`;
+				break;
+		}
+
+		// 同步执行转换（阻塞直到完成）
+		execSync(command, { stdio: 'ignore' }); // 隐藏 ffmpeg 输出
+
+		// 删除临时 m4a 文件
+		try {
+			fs.unlinkSync(inputPath);
+		} catch (error: any) {
+			log(chalk.yellow(`Warning: Could not delete temp file`));
+		}
+
+		log(chalk.green(`✅ Converted to ${format.toUpperCase()}`));
+		return true;
+
+	} catch (error: any) {
+		log(chalk.red(`❌ Conversion failed: ${error.message || 'Unknown error'}`));
+		log(chalk.yellow(`Hint: Install FFmpeg or run: npm install ffmpeg-static`));
+		// 转换失败，保留 m4a 文件
+		return false;
+	}
+}
+
 // ==================== HTML/数据获取 ====================
 async function fetchVideoHtml(url: string): Promise<string> {
 	const response = await axios.get(url, {
@@ -349,11 +419,33 @@ async function downloadAudioToFolder(
 				continue;
 			}
 
-			// 下载成功,保存文件
-			const filename = generateFilename(videoInfo, 'flac');
-			const filepath = path.join(targetFolder, filename);
-			fs.writeFileSync(filepath, Buffer.from(res.data));
-			log(chalk.green(`✅ Download finished: ${filename}`));
+			// 下载成功,保存为临时 m4a 文件
+			const tempFilename = generateFilename(videoInfo, 'm4a');
+			const tempFilepath = path.join(targetFolder, tempFilename);
+			fs.writeFileSync(tempFilepath, Buffer.from(res.data));
+
+			// 如果目标格式不是 m4a，则转换
+			if (config.audioFormat !== 'm4a') {
+				const finalFilename = generateFilename(videoInfo, config.audioFormat);
+				const finalFilepath = path.join(targetFolder, finalFilename);
+
+				const success = convertAudioFormat(
+					tempFilepath,
+					finalFilepath,
+					config.audioFormat,
+					config.audioBitrate
+				);
+
+				if (success) {
+					log(chalk.green(`✅ Download finished: ${finalFilename}`));
+				} else {
+					log(chalk.red(`❌ Conversion failed, keeping original m4a file`));
+					log(chalk.yellow(`Saved as: ${tempFilename}`));
+				}
+			} else {
+				log(chalk.green(`✅ Download finished: ${tempFilename}`));
+			}
+
 			return true;
 		} catch (error: any) {
 			const errorMsg = error instanceof Error ? error.message : String(error);

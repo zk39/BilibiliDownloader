@@ -9,7 +9,8 @@
     "axios": "^1.12.2",
     "chalk": "^4.1.2",
     "cli-progress": "^3.12.0",
-     
+    "ffmpeg-static": "^5.3.0",
+    "fluent-ffmpeg": "^2.1.3",
     "typedoc-plugin-markdown": "^4.9.0"
   },
   "scripts": {
@@ -18,13 +19,13 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc && node dist/downloader.js",
     "dev:strict": "concurrently \"npm run typecheck\" \"npm run dev\"",
-	"docs": "typedoc"	
+    "docs": "typedoc"
   },
   "nodemonConfig": {
     "ignore": [
       "*.m4a",
       "*.mp4",
-	  "*.flac",
+      "*.flac",
       "*.mp3",
       "test.html",
       "playinfo.json"
@@ -33,12 +34,17 @@
   },
   "bin": "./downloader.js",
   "pkg": {
-    "assets": ["node_modules/chalk/**/*"],
-    "targets": ["node18-win-x64", "node18-macos-x64"]
+    "assets": [
+      "node_modules/chalk/**/*"
+    ],
+    "targets": [
+      "node18-win-x64",
+      "node18-macos-x64"
+    ]
   },
   "name": "bilibili-audio-downloader",
   "version": "0.0.1",
-   "description": "Download audio from Bilibili videos",
+  "description": "Download audio from Bilibili videos",
   "author": "kun",
   "license": "MIT"
 }
