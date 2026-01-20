@@ -2,10 +2,28 @@ import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
-import * as chalk from 'chalk';
 import { execSync } from 'child_process';
 import pLimit from 'p-limit';
 import cliProgress from 'cli-progress';
+
+// chalk 需要特殊处理以兼容 pkg
+let chalk: any;
+try {
+	chalk = require('chalk');
+} catch (error) {
+	// 如果导入失败，使用简单的替代品
+	chalk = {
+		green: (text: string) => text,
+		red: (text: string) => text,
+		yellow: (text: string) => text,
+		blue: (text: string) => text,
+		cyan: (text: string) => text,
+		gray: (text: string) => text,
+		white: (text: string) => text,
+		magenta: (text: string) => text,
+		bold: { cyan: (text: string) => text }
+	};
+}
 
 // 动态导入 ffmpeg-static
 let ffmpegPath: string = 'ffmpeg';
@@ -58,6 +76,13 @@ interface SeasonArchive {
 	is_lesson_video: number;
 }
 
+interface FailedDownload {
+	bvid: string;
+	title: string;
+	url: string;
+	error?: string;
+}
+
 interface SeasonMeta {
 	category: number;
 	cover: string;
@@ -101,10 +126,16 @@ interface Config {
 const log = console.log;
 log('Downloader module loaded');
 
+// ==================== 路径处理 (pkg 兼容) ====================
+// 检测是否在 pkg 打包环境中运行
+const isPkg = typeof (process as any).pkg !== 'undefined';
+// 如果是打包环境，使用可执行文件所在目录；否则使用 __dirname
+const baseDir = isPkg ? path.dirname(process.execPath) : __dirname;
+
 // ==================== Config (只保留配置相关的全局变量) ====================
 const config: Config = {
-	downloadDir: path.join(__dirname, "downloads"),
-	cookieFile: path.join(__dirname, 'cookies.txt'),
+	downloadDir: path.join(baseDir, "downloads"),
+	cookieFile: path.join(baseDir, 'cookies.txt'),
 	audioFormat: 'mp3', // 默认转换为 FLAC 音乐格式
 	audioBitrate: '320k', // MP3 比特率
 	ffmpegPath: ffmpegPath || 'ffmpeg', // 使用打包的 ffmpeg，如果没有则使用系统的
@@ -167,46 +198,44 @@ function validateCookie(cookie: string): boolean {
 	return true;
 }
 
-function setupCookie(rl: readline.Interface): Promise<void> {
-	return new Promise((resolve) => {
-		log(chalk.yellow('No cookies found. Please enter your Bilibili cookies to proceed.'));
-		log(chalk.gray('(You can get it from browser DevTools -> Application -> Cookies)\n'));
+function setupCookie(rl: readline.Interface, callback: () => void): void {
+	log(chalk.yellow('No cookies found. Please enter your Bilibili cookies to proceed.'));
+	log(chalk.gray('(You can get it from browser DevTools -> Application -> Cookies)\n'));
 
-		const askForCookie = () => {
-			rl.question('Enter your cookies: ', (inputCookie) => {
-				if (!inputCookie.trim()) {
-					log(chalk.red('Cookie cannot be empty!'));
-					promptRetry();
-					return;
-				}
+	const askForCookie = () => {
+		rl.question('Enter your cookies: ', (inputCookie) => {
+			if (!inputCookie.trim()) {
+				log(chalk.red('Cookie cannot be empty!'));
+				promptRetry();
+				return;
+			}
 
-				if (!validateCookie(inputCookie)) {
-					promptRetry();
-					return;
-				}
+			if (!validateCookie(inputCookie)) {
+				promptRetry();
+				return;
+			}
 
-				config.headers.cookie = inputCookie.trim();
-				fs.writeFileSync(config.cookieFile, inputCookie.trim(), 'utf-8');
-				log(chalk.green('Cookies saved successfully.\n'));
-				resolve();
-			});
-		};
+			config.headers.cookie = inputCookie.trim();
+			fs.writeFileSync(config.cookieFile, inputCookie.trim(), 'utf-8');
+			log(chalk.green('Cookies saved successfully.\n'));
+			callback();
+		});
+	};
 
-		const promptRetry = () => {
-			rl.question('Do you want to re-enter cookies? (y/n): ', (answer) => {
-				const trimmed = answer.trim().toLowerCase();
-				if (trimmed === 'y' || trimmed === 'yes') {
-					askForCookie();
-				} else {
-					log(chalk.red('Cannot proceed without valid cookies. Exiting.'));
-					rl.close();
-					process.exit(1);
-				}
-			});
-		};
+	const promptRetry = () => {
+		rl.question('Do you want to re-enter cookies? (y/n): ', (answer) => {
+			const trimmed = answer.trim().toLowerCase();
+			if (trimmed === 'y' || trimmed === 'yes') {
+				askForCookie();
+			} else {
+				log(chalk.red('Cannot proceed without valid cookies. Exiting.'));
+				rl.close();
+				process.exit(1);
+			}
+		});
+	};
 
-		askForCookie();
-	});
+	askForCookie();
 }
 
 // ==================== URL 解析 ====================
@@ -240,16 +269,28 @@ function extractSeasonId(url: string): string | null {
 
 // ==================== 文件名处理 ====================
 function sanitizeFilename(filename: string): string {
-	// 移除或替换Windows/Linux文件系统中的非法字符
+	// 只移除文件系统不允许的字符
 	return filename
-		.replace(/[<>:"/\\|?*]/g, '') // 移除非法字符
+		.replace(/[<>:"/\\|?*]/g, '') // Windows/Linux 非法字符
+		.replace(/[\x00-\x1f]/g, '') // 控制字符
 		.replace(/\s+/g, ' ') // 多个空格替换为单个
 		.trim()
-		.substring(0, 200); // 限制长度，避免过长
+		.substring(0, 200); // 限制长度
+}
+
+function extractTitleFromBrackets(title: string): string {
+	// 提取书名号《》内的内容
+	const match = title.match(/《([^》]+)》/);
+	if (match && match[1]) {
+		return match[1].trim();
+	}
+	return title;
 }
 
 function generateFilename(videoInfo: VideoInfo, extension: string): string {
-	const title = sanitizeFilename(videoInfo.title);
+	// 先提取书名号内容
+	const extractedTitle = extractTitleFromBrackets(videoInfo.title);
+	const title = sanitizeFilename(extractedTitle);
 	const author = sanitizeFilename(videoInfo.author);
 	return `${title} - ${author}.${extension}`;
 }
@@ -259,15 +300,16 @@ function convertAudioFormat(
 	inputPath: string,
 	outputPath: string,
 	format: 'flac' | 'mp3' | 'wav' | 'm4a',
-	bitrate?: string
+	bitrate?: string,
+	silent: boolean = false
 ): boolean {
 	try {
-		log(chalk.blue(`Converting to ${format.toUpperCase()}...`));
+		if (!silent) log(chalk.blue(`Converting to ${format.toUpperCase()}...`));
 
 		// 如果是 m4a，直接复制不转换
 		if (format === 'm4a') {
 			fs.copyFileSync(inputPath, outputPath);
-			log(chalk.green(`✅ Saved as M4A`));
+			if (!silent) log(chalk.green(`✅ Saved as M4A`));
 			return true;
 		}
 
@@ -277,32 +319,34 @@ function convertAudioFormat(
 		let command = '';
 		switch (format) {
 			case 'flac':
-				command = `"${ffmpegExe}" -i "${inputPath}" -c:a flac -compression_level 8 "${outputPath}" -y`;
+				command = `"${ffmpegExe}" -i "${inputPath}" -c:a flac -compression_level 8 "${outputPath}" -y -loglevel error`;
 				break;
 			case 'mp3':
-				command = `"${ffmpegExe}" -i "${inputPath}" -c:a libmp3lame -b:a ${bitrate || '320k'} "${outputPath}" -y`;
+				command = `"${ffmpegExe}" -i "${inputPath}" -c:a libmp3lame -b:a ${bitrate || '320k'} "${outputPath}" -y -loglevel error`;
 				break;
 			case 'wav':
-				command = `"${ffmpegExe}" -i "${inputPath}" -c:a pcm_s16le "${outputPath}" -y`;
+				command = `"${ffmpegExe}" -i "${inputPath}" -c:a pcm_s16le "${outputPath}" -y -loglevel error`;
 				break;
 		}
 
-		// 同步执行转换（阻塞直到完成）
-		execSync(command, { stdio: 'ignore' }); // 隐藏 ffmpeg 输出
+		// 同步执行转换
+		execSync(command, { stdio: 'pipe' });
 
 		// 删除临时 m4a 文件
 		try {
 			fs.unlinkSync(inputPath);
 		} catch (error: any) {
-			log(chalk.yellow(`Warning: Could not delete temp file`));
+			// 忽略删除错误
 		}
 
-		log(chalk.green(`✅ Converted to ${format.toUpperCase()}`));
+		if (!silent) log(chalk.green(`✅ Converted to ${format.toUpperCase()}`));
 		return true;
 
 	} catch (error: any) {
-		log(chalk.red(`❌ Conversion failed: ${error.message || 'Unknown error'}`));
-		log(chalk.yellow(`Hint: Install FFmpeg or run: npm install ffmpeg-static`));
+		if (!silent) {
+			log(chalk.red(`❌ Conversion failed: ${error.message || 'Unknown error'}`));
+			log(chalk.yellow(`Hint: Install FFmpeg or run: npm install ffmpeg-static`));
+		}
 		// 转换失败，保留 m4a 文件
 		return false;
 	}
@@ -382,14 +426,16 @@ function extractVideoDataFromHtml(html: string, bvid: string): VideoData | null 
 async function downloadAudioToFolder(
 	audioStreams: AudioStream[],
 	videoInfo: VideoInfo,
-	targetFolder: string
+	targetFolder: string,
+	silent: boolean = false,
+	progressCallback?: (progress: number, status: string) => void
 ): Promise<boolean> {
 	if (audioStreams.length === 0) {
-		log(chalk.red('No audio streams found to download.'));
+		if (!silent) log(chalk.red('No audio streams found to download.'));
 		return false;
 	}
 
-	log(chalk.yellow(`Found ${audioStreams.length} audio stream(s). Downloading the highest quality one.`));
+	if (!silent) log(chalk.yellow(`Found ${audioStreams.length} audio stream(s). Downloading the highest quality one.`));
 
 	// 按带宽排序,选择最高质量
 	const sortedStreams = [...audioStreams].sort((a, b) => b.bandwidth - a.bandwidth);
@@ -406,22 +452,33 @@ async function downloadAudioToFolder(
 	// 尝试每个URL直到成功
 	for (const url of urlsToDownload) {
 		try {
-			log(chalk.blue(`Downloading audio from URL: ${url.substring(0, 80)}...`));
+			if (!silent) log(chalk.blue(`Downloading audio from URL: ${url.substring(0, 80)}...`));
+			if (progressCallback) progressCallback(5, chalk.cyan('Connecting...'));
 
 			const res = await axios.get(url, {
 				headers: config.headers,
 				responseType: 'arraybuffer',
+				onDownloadProgress: (progressEvent) => {
+					if (progressCallback && progressEvent.total) {
+						const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+						// 下载阶段占 5-85%
+						const adjustedProgress = 5 + Math.round(percentCompleted * 0.8);
+						progressCallback(adjustedProgress, chalk.cyan(`Downloading ${percentCompleted}%`));
+					}
+				}
 			});
 
 			if (res.status !== 200) {
-				log(chalk.yellow(`Warning: Received status code ${res.status}. Trying next URL...`));
+				if (!silent) log(chalk.yellow(`Warning: Received status code ${res.status}. Trying next URL...`));
 				continue;
 			}
 
 			if (!res.data || res.data.byteLength === 0) {
-				log(chalk.yellow('Warning: Empty response data. Trying next URL...'));
+				if (!silent) log(chalk.yellow('Warning: Empty response data. Trying next URL...'));
 				continue;
 			}
+
+			if (progressCallback) progressCallback(90, chalk.yellow('Saving file...'));
 
 			// 下载成功,保存为临时 m4a 文件
 			const tempFilename = generateFilename(videoInfo, 'm4a');
@@ -430,6 +487,8 @@ async function downloadAudioToFolder(
 
 			// 如果目标格式不是 m4a，则转换
 			if (config.audioFormat !== 'm4a') {
+				if (progressCallback) progressCallback(93, chalk.magenta('Converting...'));
+
 				const finalFilename = generateFilename(videoInfo, config.audioFormat);
 				const finalFilepath = path.join(targetFolder, finalFilename);
 
@@ -437,29 +496,39 @@ async function downloadAudioToFolder(
 					tempFilepath,
 					finalFilepath,
 					config.audioFormat,
-					config.audioBitrate
+					config.audioBitrate,
+					silent
 				);
 
 				if (success) {
-					log(chalk.green(`✅ Download finished: ${finalFilename}`));
+					if (!silent) log(chalk.green(`✅ Download finished: ${finalFilename}`));
+					if (progressCallback) progressCallback(100, chalk.green('✓ Done'));
 				} else {
-					log(chalk.red(`❌ Conversion failed, keeping original m4a file`));
-					log(chalk.yellow(`Saved as: ${tempFilename}`));
+					if (!silent) {
+						log(chalk.red(`❌ Conversion failed, keeping original m4a file`));
+						log(chalk.yellow(`Saved as: ${tempFilename}`));
+					}
+					if (progressCallback) progressCallback(100, chalk.yellow('✓ Saved (m4a)'));
 				}
 			} else {
-				log(chalk.green(`✅ Download finished: ${tempFilename}`));
+				if (!silent) log(chalk.green(`✅ Download finished: ${tempFilename}`));
+				if (progressCallback) progressCallback(100, chalk.green('✓ Done'));
 			}
 
 			return true;
 		} catch (error: any) {
 			const errorMsg = error instanceof Error ? error.message : String(error);
-			log(chalk.yellow(`Error downloading from ${url.substring(0, 50)}...: ${errorMsg}`));
-			log(chalk.yellow('Trying next URL...'));
+			if (!silent) {
+				log(chalk.yellow(`Error downloading from ${url.substring(0, 50)}...: ${errorMsg}`));
+				log(chalk.yellow('Trying next URL...'));
+			}
+			if (progressCallback) progressCallback(0, chalk.red('Error, retrying...'));
 			continue;
 		}
 	}
 
-	log(chalk.red('❌ Failed to download audio from all available URLs.'));
+	if (!silent) log(chalk.red('❌ Failed to download audio from all available URLs.'));
+	if (progressCallback) progressCallback(0, chalk.red('✗ Failed'));
 	return false;
 }
 
@@ -687,37 +756,68 @@ async function downloadSingleVideo(url: string): Promise<boolean> {
 async function downloadSingleArchive(
 	archive: SeasonArchive,
 	seasonFolder: string,
+	videoBar: any,
 	index: number,
 	total: number
-): Promise<{ success: boolean, title: string }> {
-	try {
-		// 构建视频URL
-		const videoUrl = `https://www.bilibili.com/video/${archive.bvid}`;
+): Promise<{ success: boolean, title: string, bvid: string, url: string, error?: string }> {
+	const videoUrl = `https://www.bilibili.com/video/${archive.bvid}`;
 
+	try {
 		// 获取视频数据
+		videoBar.update(0, { status: chalk.yellow('Fetching info...') });
 		const html = await fetchVideoHtml(videoUrl);
 		const videoData = extractVideoDataFromHtml(html, archive.bvid);
 
 		if (!videoData) {
-			return { success: false, title: archive.title };
+			videoBar.update(0, { status: chalk.red('✗ Failed') });
+			return {
+				success: false,
+				title: archive.title,
+				bvid: archive.bvid,
+				url: videoUrl,
+				error: 'Failed to extract video data'
+			};
 		}
 
-		// 下载音频到合集文件夹
+		// 下载音频到合集文件夹，使用进度回调
 		const downloaded = await downloadAudioToFolder(
 			videoData.audioArr,
 			videoData.videoInfo,
-			seasonFolder
+			seasonFolder,
+			true, // silent mode
+			(progress, status) => {
+				videoBar.update(progress, { status });
+			}
 		);
 
-		return { success: downloaded, title: videoData.videoInfo.title };
+		if (downloaded) {
+			videoBar.update(100, { status: chalk.green('✓ Completed') });
+		} else {
+			videoBar.update(0, { status: chalk.red('✗ Failed') });
+		}
+
+		return {
+			success: downloaded,
+			title: videoData.videoInfo.title,
+			bvid: archive.bvid,
+			url: videoUrl,
+			error: downloaded ? undefined : 'Download or conversion failed'
+		};
 
 	} catch (error: any) {
-		return { success: false, title: archive.title };
+		videoBar.update(0, { status: chalk.red('✗ Error') });
+		return {
+			success: false,
+			title: archive.title,
+			bvid: archive.bvid,
+			url: videoUrl,
+			error: error.message || 'Unknown error'
+		};
 	}
 }
 
-// ==================== 合集下载（并发版本） ====================
-async function downloadSeasonArchives(archives: SeasonArchive[], meta: SeasonMeta): Promise<boolean> {
+// ==================== 合集下载（多进度条版本） ====================
+async function downloadSeasonArchives(archives: SeasonArchive[], meta: SeasonMeta, rl: readline.Interface): Promise<boolean> {
 	try {
 		log(chalk.green(`\n=== Starting download: ${meta.title} ===`));
 		log(chalk.green(`Total videos: ${archives.length}`));
@@ -732,74 +832,198 @@ async function downloadSeasonArchives(archives: SeasonArchive[], meta: SeasonMet
 			log(chalk.blue(`Created folder: ${seasonFolderName}\n`));
 		}
 
-		// 创建进度条
-		const progressBar = new cliProgress.SingleBar({
-			format: chalk.cyan('{bar}') + ' | {percentage}% | {value}/{total} | Current: {current}',
-			barCompleteChar: '\u2588',
-			barIncompleteChar: '\u2591',
-			hideCursor: true
-		});
+		let failedDownloads: FailedDownload[] = [];
+		let archivesToDownload = [...archives];
 
-		progressBar.start(archives.length, 0, {
-			current: 'Initializing...'
-		});
+		// 下载循环（支持重试）
+		while (archivesToDownload.length > 0) {
+			// 创建多进度条容器
+			const multibar = new cliProgress.MultiBar({
+				clearOnComplete: false,
+				hideCursor: true,
+				format: ' {bar} | {percentage}% | {number} | {title} | {status}',
+				barCompleteChar: '\u2588',
+				barIncompleteChar: '\u2591',
+			}, cliProgress.Presets.shades_grey);
 
-		// 并发控制
-		const limit = pLimit(config.concurrency);
-		let completed = 0;
-		let successCount = 0;
+			// 总进度条
+			const totalBar = multibar.create(archivesToDownload.length, 0, {
+				number: chalk.cyan('Overall'),
+				title: '',
+				status: 'Starting...'
+			});
 
-		// 创建所有下载任务
-		const tasks = archives.map((archive, index) =>
-			limit(async () => {
-				// 更新进度条显示当前下载
-				progressBar.update(completed, {
-					current: chalk.yellow(archive.title.substring(0, 40) + '...')
+			// 并发控制
+			const limit = pLimit(config.concurrency);
+			let completed = 0;
+			let successCount = 0;
+			const currentFailed: FailedDownload[] = [];
+
+			// 活动进度条池
+			const activeVideoBars: Map<string, any> = new Map();
+
+			// 创建所有下载任务
+			const tasks = archivesToDownload.map((archive, idx) =>
+				limit(async () => {
+					const currentIndex = idx + 1;
+					const totalCount = archivesToDownload.length;
+
+					// 创建该视频的进度条
+					const shortTitle = archive.title.length > 35
+						? archive.title.substring(0, 35) + '...'
+						: archive.title.padEnd(38);
+
+					const videoBar = multibar.create(100, 0, {
+						number: chalk.white(`[${String(currentIndex).padStart(3)}/${totalCount}]`),
+						title: chalk.white(shortTitle),
+						status: chalk.yellow('Waiting...')
+					});
+
+					activeVideoBars.set(archive.bvid, videoBar);
+
+					// 下载
+					const result = await downloadSingleArchive(
+						archive,
+						seasonFolder,
+						videoBar,
+						currentIndex,
+						totalCount
+					);
+
+					// 更新计数
+					completed++;
+					if (result.success) {
+						successCount++;
+					} else {
+						currentFailed.push({
+							bvid: result.bvid,
+							title: result.title,
+							url: result.url,
+							error: result.error
+						});
+					}
+
+					// 更新总进度条
+					totalBar.increment(1);
+					totalBar.update({
+						status: `${chalk.green(successCount)} ok / ${chalk.red(currentFailed.length)} failed`
+					});
+
+					// 短暂延迟让用户看到完成状态，然后移除进度条
+					await new Promise(resolve => setTimeout(resolve, 800));
+					videoBar.stop();
+					multibar.remove(videoBar);
+					activeVideoBars.delete(archive.bvid);
+
+					return result;
+				})
+			);
+
+			// 等待所有任务完成
+			await Promise.all(tasks);
+
+			// 等待一下确保所有进度条都已移除
+			await new Promise(resolve => setTimeout(resolve, 500));
+
+			// 停止总进度条
+			totalBar.stop();
+			multibar.stop();
+
+			// 显示结果
+			log(chalk.green(`\n✅ Download complete: ${successCount}/${archivesToDownload.length} successful`));
+
+			// 如果有失败的
+			if (currentFailed.length > 0) {
+				failedDownloads = currentFailed;
+				log(chalk.red(`\n❌ Failed (${failedDownloads.length}):`));
+				failedDownloads.slice(0, 5).forEach(f => {
+					log(chalk.gray(`  - ${f.title}`));
+					log(chalk.gray(`    ${f.url}`));
+					if (f.error) log(chalk.gray(`    Error: ${f.error}`));
 				});
-
-				// 下载
-				const result = await downloadSingleArchive(archive, seasonFolder, index + 1, archives.length);
-
-				// 更新计数
-				completed++;
-				if (result.success) {
-					successCount++;
+				if (failedDownloads.length > 5) {
+					log(chalk.gray(`  ... and ${failedDownloads.length - 5} more`));
 				}
 
-				// 更新进度条
-				progressBar.update(completed, {
-					current: result.success
-						? chalk.green(`✓ ${result.title.substring(0, 40)}`)
-						: chalk.red(`✗ ${result.title.substring(0, 40)}`)
-				});
+				// 保存失败列表
+				const failedJsonPath = path.join(seasonFolder, 'failed_downloads.json');
+				fs.writeFileSync(failedJsonPath, JSON.stringify(failedDownloads, null, 2), 'utf-8');
+				log(chalk.yellow(`\n📄 Failed list saved to: ${failedJsonPath}`));
 
-				return result;
-			})
-		);
+				// 询问用户
+				const choice = await askRetryChoice(rl, failedDownloads.length);
 
-		// 等待所有任务完成
-		const results = await Promise.all(tasks);
-
-		// 停止进度条
-		progressBar.stop();
-
-		// 显示结果
-		log(chalk.green(`\n✅ Download complete: ${successCount}/${archives.length} successful`));
-
-		// 显示失败的
-		const failed = results.filter(r => !r.success);
-		if (failed.length > 0) {
-			log(chalk.red(`\n❌ Failed (${failed.length}):`));
-			failed.forEach(f => log(chalk.gray(`  - ${f.title}`)));
+				if (choice === 'retry') {
+					// 重试失败的
+					archivesToDownload = archives.filter(a =>
+						failedDownloads.some(f => f.bvid === a.bvid)
+					);
+					log(chalk.cyan(`\n🔄 Retrying ${archivesToDownload.length} failed downloads...\n`));
+					continue;
+				} else if (choice === 'view') {
+					// 显示失败列表JSON
+					log(chalk.cyan(`\n📋 Failed downloads JSON:\n`));
+					log(JSON.stringify(failedDownloads, null, 2));
+					log(chalk.yellow(`\nSaved to: ${failedJsonPath}\n`));
+					break;
+				} else {
+					// 跳过
+					break;
+				}
+			} else {
+				// 全部成功
+				break;
+			}
 		}
 
-		return successCount > 0;
+		return true;
 
 	} catch (error: any) {
 		const errorMsg = error instanceof Error ? error.message : String(error);
 		log(chalk.red('Error during season download:', errorMsg));
 		return false;
 	}
+}
+
+// ==================== 重试选择菜单 ====================
+async function askRetryChoice(rl: readline.Interface, failedCount: number): Promise<'retry' | 'view' | 'skip'> {
+	return new Promise((resolve) => {
+		log(chalk.yellow(`\nWhat would you like to do with ${failedCount} failed downloads?`));
+		log(chalk.white('  [1] Retry failed downloads'));
+		log(chalk.white('  [2] View failed list (JSON)'));
+		log(chalk.white('  [3] Skip and continue\n'));
+
+		rl.pause();
+		if (process.stdin.isTTY) {
+			process.stdin.setRawMode(true);
+		}
+		process.stdin.resume();
+
+		const onKeyPress = (key: string) => {
+			cleanup();
+
+			if (key === '1') {
+				resolve('retry');
+			} else if (key === '2') {
+				resolve('view');
+			} else if (key === '3' || key === '\u001b') {
+				resolve('skip');
+			} else if (key === '\u0003') {
+				process.exit(0);
+			}
+		};
+
+		const cleanup = () => {
+			process.stdin.removeListener('data', onKeyPress);
+			if (process.stdin.isTTY) {
+				process.stdin.setRawMode(false);
+			}
+			process.stdin.pause();
+			rl.resume();
+		};
+
+		process.stdin.on('data', onKeyPress);
+	});
 }
 
 async function downloadSeason(url: string, rl: readline.Interface): Promise<boolean> {
@@ -835,7 +1059,7 @@ async function downloadSeason(url: string, rl: readline.Interface): Promise<bool
 			}
 
 			if (choice === 'download') {
-				return await downloadSeasonArchives(archives, meta);
+				return await downloadSeasonArchives(archives, meta, rl);
 			}
 		}
 
@@ -847,24 +1071,25 @@ async function downloadSeason(url: string, rl: readline.Interface): Promise<bool
 }
 
 // ==================== CLI ====================
-async function cli(rl: readline.Interface): Promise<void> {
-	return new Promise((resolve) => {
-		rl.question('Enter the video/collection URL (or q/quit to exit): ', async (url) => {
-			const trimmed = url.trim().toLowerCase();
+function cli(rl: readline.Interface, callback: () => void): void {
+	rl.question('Enter the video/collection URL (or q/quit to exit): ', (url) => {
+		const trimmed = url.trim().toLowerCase();
 
-			if (trimmed === 'q' || trimmed === 'quit') {
-				log(chalk.green('Bye!'));
-				rl.close();
-				process.exit(0);
-				return;
-			}
+		if (trimmed === 'q' || trimmed === 'quit') {
+			log(chalk.green('Bye!'));
+			rl.close();
+			process.exit(0);
+			return;
+		}
 
-			if (!url.includes('bilibili') && !url.includes('bv')) {
-				log(chalk.yellow('Invalid URL, please try again.\n'));
-				resolve();
-				return;
-			}
+		if (!url.includes('bilibili') && !url.includes('bv')) {
+			log(chalk.yellow('Invalid URL, please try again.\n'));
+			callback();
+			return;
+		}
 
+		// 使用 IIFE 处理异步操作
+		(async () => {
 			try {
 				let success = false;
 				// 判断是否为合集URL
@@ -876,7 +1101,7 @@ async function cli(rl: readline.Interface): Promise<void> {
 					success = await downloadSingleVideo(url);
 				} else {
 					log(chalk.yellow('Unknown URL format. Please provide a valid Bilibili video or season URL.\n'));
-					resolve();
+					callback();
 					return;
 				}
 
@@ -891,8 +1116,8 @@ async function cli(rl: readline.Interface): Promise<void> {
 				log(chalk.yellow('Please try again.\n'));
 			}
 
-			resolve();
-		});
+			callback();
+		})();
 	});
 }
 
@@ -904,7 +1129,7 @@ const welcomeMessage = () => console.log(`
 ╚══════════════════════════════════════╝
 `);
 
-async function main() {
+function main() {
 	welcomeMessage();
 
 	const rl = readline.createInterface({
@@ -914,17 +1139,25 @@ async function main() {
 
 	// 加载或设置 cookies
 	const hasCookie = loadCookies();
-	if (!hasCookie) {
-		await setupCookie(rl);
-	}
 
-	// 主循环
-	while (true) {
-		await cli(rl);
+	if (!hasCookie) {
+		// 使用回调而不是 Promise
+		setupCookie(rl, () => {
+			// Cookie 设置完成后，开始主循环
+			runMainLoop(rl);
+		});
+	} else {
+		// 直接开始主循环
+		runMainLoop(rl);
 	}
 }
 
-main().catch((error: any) => {
-	log(chalk.red('Fatal error:', error));
-	process.exit(1);
-});
+// 主循环函数
+function runMainLoop(rl: readline.Interface): void {
+	cli(rl, () => {
+		// CLI 完成后，递归调用继续循环
+		runMainLoop(rl);
+	});
+}
+
+main();
