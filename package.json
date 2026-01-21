@@ -1,52 +1,57 @@
 {
-  "devDependencies": {
-    "@types/cli-progress": "^3.11.6",
-    "@types/node": "^24.10.9",
-    "pkg": "^5.8.1",
-    "ts-node": "^10.9.2",
-    "tsx": "^4.16.0",
-    "typescript": "^5.9.3"
-  },
-  "dependencies": {
-    "axios": "0.27.2",
-    "chalk": "4.1.2",
-    "cli-progress": "^3.12.0",
-    "ffmpeg-static": "^5.2.0",
-    "p-limit": "^3.1.0"
-  },
-  "scripts": {
-    "dev": "tsx downloader.ts",
-    "start": "tsx downloader.ts",
-    "typecheck": "tsc --noEmit",
-    "build": "tsc",
-    "dev:strict": "concurrently \"npm run typecheck\" \"npm run dev\"",
-    "docs": "typedoc",
-    "pkg:win": "tsc && pkg dist/downloader.js --targets node18-win-x64 --output build/bili-downloader-win.exe"
-  },
-  "nodemonConfig": {
-    "ignore": [
-      "*.m4a",
-      "*.mp4",
-      "*.flac",
-      "*.mp3",
-      "test.html",
-      "playinfo.json"
-    ],
-    "ext": "ts,js,json"
-  },
-  "bin": "./downloader.js",
-  "pkg": {
-    "assets": [
-      "node_modules/chalk/**/*"
-    ],
-    "targets": [
-      "node18-win-x64",
-      "node18-macos-x64"
-    ]
-  },
-  "name": "bilibili-audio-downloader",
-  "version": "0.0.1",
-  "description": "Download audio from Bilibili videos",
-  "author": "kun",
-  "license": "MIT"
+	"devDependencies": {
+		"@types/cli-progress": "^3.11.6",
+		"@types/node": "^24.10.9",
+		"pkg": "^5.8.1",
+		"ts-node": "^10.9.2",
+		"tsx": "^4.16.0",
+		"typescript": "^5.9.3"
+	},
+	"dependencies": {
+		"axios": "0.27.2",
+		"chalk": "4.1.2",
+		"cli-progress": "^3.12.0",
+		"ffmpeg-static": "^5.3.0",
+		"p-limit": "^3.1.0"
+	},
+	"scripts": {
+		"dev": "tsx downloader.ts",
+		"start": "tsx downloader.ts",
+		"typecheck": "tsc --noEmit",
+		"build": "tsc",
+		"dev:strict": "concurrently \"npm run typecheck\" \"npm run dev\"",
+		"docs": "typedoc",
+		"pkg:win": "tsc && pkg dist/downloader.js --targets node18-win-x64 --output build/bili-downloader-win.exe",
+		"pkg:mac": "tsc && pkg dist/downloader.js --targets node18-macos-x64 --output build/bili-downloader-macos-x64",
+		"pkg:mac-arm": "tsc && pkg dist/downloader.js --targets node18-macos-arm64 --output build/bili-downloader-macos-arm64",
+		"pkg:linux": "tsc && pkg dist/downloader.js --targets node18-linux-x64 --output build/bili-downloader-linux-x64",
+		"pkg:linux-arm": "tsc && pkg dist/downloader.js --targets node18-linux-arm64 --output build/bili-downloader-linux-arm64",
+		"pkg:all": "tsc && pkg dist/downloader.js --targets node18-win-x64,node18-macos-x64,node18-macos-arm64,node18-linux-x64,node18-linux-arm64 --output build/bili-downloader"
+	},
+	"nodemonConfig": {
+		"ignore": [
+			"*.m4a",
+			"*.mp4",
+			"*.flac",
+			"*.mp3",
+			"test.html",
+			"playinfo.json"
+		],
+		"ext": "ts,js,json"
+	},
+	"bin": "./downloader.js",
+	"pkg": {
+		"assets": [
+			"node_modules/chalk/**/*"
+		],
+		"targets": [
+			"node18-win-x64",
+			"node18-macos-x64"
+		]
+	},
+	"name": "bilibili-audio-downloader",
+	"version": "0.0.1",
+	"description": "Download audio from Bilibili videos",
+	"author": "kun",
+	"license": "MIT"
 }
