@@ -1,5 +1,5 @@
 [English](README.md) | [简体中文](README.zh-CN.md)
-# BilibiliDownloader
+# BiliAudioDownloader
 Download bilibili audio 
  
 1. Find your cookie and paste it
