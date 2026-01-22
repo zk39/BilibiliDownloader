@@ -1,5 +1,4 @@
-[English](README.md) | [简体中文](README.zh-CN.md) | [About How to get your cookies/如何获得你的cookie](HowToGetUrAuthToken.md)
-
+[简体中文](README.zh-CN.md) | [English](README.en-US.md) | [About How to get your cookies/如何获得你的cookie](HowToGetUrAuthToken.md)
 # BiliAudioDownloader
 下载 Bilibili 音频
 
