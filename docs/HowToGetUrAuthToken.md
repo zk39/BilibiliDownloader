@@ -1,3 +1,5 @@
+ [简体中文](README.zh-CN.md) | [English](README.en-US.md) | [About How to get your cookies/如何获得你的cookie](HowToGetUrAuthToken.md)
+
 # Bilibili Cookie 获取教程 / Bilibili Cookie Retrieval Guide
 
 ## 找到你的cookie  Find your cookie🍪
