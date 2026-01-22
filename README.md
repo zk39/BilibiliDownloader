@@ -2,7 +2,7 @@
 # BiliAudioDownloader
 Download bilibili audio 
 ```
-1. Find your cookie and paste it
+1. Find your cookie and paste it, please check 'How to get your cookies' page to get your bilibili Cookie
 ```
 <img width="2086" height="1348" alt="image" src="https://github.com/user-attachments/assets/ac526053-0ca8-4df3-8a85-ff5ba139e0b7" />
 
