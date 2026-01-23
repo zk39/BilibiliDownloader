@@ -20,7 +20,7 @@
 
 <img width="600" alt="image" src="https://github.com/user-attachments/assets/ec672a47-bbfb-4169-8132-20ceff59f313" />
 
-### 5. 找到 Cookie 选项，从 buvid4 开始 下拉到末尾的 4048，然后复制他！！！！（请不要用我的！！！！！！！！） ， Find the "Cookie" option, scroll down from "buvid4" to the "4048" at the end, and copy it!!!! (Please do not use mine!!!!!!!!) 
+### 5. 找到 Cookie 选项，从 buvid4 开始 下拉到末尾的 4048，然后复制他！！！！（请不要用我的！！！！！！！！） ， Find the "Cookie" option, scroll down from "buvid4" to the "4048" at the end, and copy it!!!! (Please DONT use mine!!!!!!!!) 
 
 <img width="600" alt="image" src="https://github.com/user-attachments/assets/3a3ed14c-8915-483c-b245-b7efc61b3026" />
 
