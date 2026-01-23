@@ -38,7 +38,7 @@
 
 ### 1. 找到你的 cookie 并粘贴它
 
-请查看"如何获得你的 cookie"页面来获取你的 B 站 Cookie
+请查看"[如何获得你的cookie](docs/HowToGetUrAuthToken.md)"页面来获取你的 B 站 Cookie
 
 <img width="600" alt="image" src="https://github.com/user-attachments/assets/ac526053-0ca8-4df3-8a85-ff5ba139e0b7" />
 
