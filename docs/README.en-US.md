@@ -1,6 +1,17 @@
  [简体中文](README.zh-CN.md) | [English](README.en-US.md) | [About How to get your cookies/如何获得你的cookie](HowToGetUrAuthToken.md)
 # BiliAudioDownloader
 Download bilibili audio 
+
+
+```
+0.
+Use npm i bili-audio-downloader to download,
+
+then type bad in your cli
+<img width="1226" height="944" alt="image" src="https://github.com/user-attachments/assets/727a8b56-118e-45cb-ae1b-93c9408bfc76" />
+
+```
+
 ```
 1. Find your cookie and paste it, please check 'How to get your cookies' page to get your bilibili Cookie
 ```
