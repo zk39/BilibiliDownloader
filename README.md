@@ -38,6 +38,16 @@
 
 ## 使用教程
 
+
+### 0. 你得有nodejs环境 然后
+```
+ npm i bili-audio-downloader
+```
+再然后输入 bad 在命令行中
+
+<img width="1238" height="944" alt="image" src="https://github.com/user-attachments/assets/f73b887c-fc1a-4d31-b797-88b1e21fc56a" />
+
+
 ### 1. 找到你的 cookie 并粘贴它
 
 请查看"[如何获得你的cookie](docs/HowToGetUrAuthToken.md)"页面来获取你的 B 站 Cookie
