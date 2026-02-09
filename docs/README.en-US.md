@@ -4,13 +4,12 @@ Download bilibili audio
 
 
 ```
-0.
-Use npm i bili-audio-downloader to download,
-
+0. Use npm i bili-audio-downloader to download,
 then type bad in your cli
-<img width="1226" height="944" alt="image" src="https://github.com/user-attachments/assets/727a8b56-118e-45cb-ae1b-93c9408bfc76" />
-
 ```
+<img width="1238" height="944" alt="image" src="https://github.com/user-attachments/assets/f73b887c-fc1a-4d31-b797-88b1e21fc56a" />
+
+
 
 ```
 1. Find your cookie and paste it, please check 'How to get your cookies' page to get your bilibili Cookie
