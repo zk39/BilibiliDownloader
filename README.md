@@ -1,22 +1,6 @@
-<<<<<<< HEAD
-[English](README.md)
-
-```
-0. Use npm i bili-audio-downloader to download,
-then type bad in your cli
-```
-
-<img width="1238" height="944" alt="image" src="https://github.com/user-attachments/assets/f73b887c-fc1a-4d31-b797-88b1e21fc56a" />
-
-```
-1. Find your cookie and paste it, please go to bilibili website,open console (right click -> inspect)
-and type document.cookie to get your bilibili Cookie
-```
-
-<img width="2086" height="1348" alt="image" src="https://github.com/user-attachments/assets/ac526053-0ca8-4df3-8a85-ff5ba139e0b7" />
-=======
+ 
 [简体中文](docs/README.zh-CN.md) | [English](docs/README.en-US.md) | [About How to get your cookies/如何获得你的cookie](docs/HowToGetUrAuthToken.md)
->>>>>>> 386c152527f9bb78c2adb485246faf2810178bad
+ 
 
 # BiliAudioDownloader
 
@@ -61,7 +45,7 @@ and type document.cookie to get your bilibili Cookie
 ```
  npm i bili-audio-downloader
 ```
-<<<<<<< HEAD
+ 
 
 Link example:
 =======
@@ -100,12 +84,11 @@ Link example:
 复制合集链接，粘贴它，然后点击回车
 
 合集链接示例：
->>>>>>> 386c152527f9bb78c2adb485246faf2810178bad
 
 ```
 https://space.bilibili.com/1437582453/lists/1235710?type=season
 ```
-<<<<<<< HEAD
+ 
 
   <img width="1904" height="1482" alt="image" src="https://github.com/user-attachments/assets/6ffc1d17-4dbe-469f-9717-74491dd02fe9" />
 =======
