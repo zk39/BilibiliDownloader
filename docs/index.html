@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Bilibili Audio Downloader - Download audio from Bilibili videos and collections">
+    <title>Bilibili Audio Downloader</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* ==================== 背景渐变 ==================== */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            /* 黑色到深灰色的径向渐变 */
+            background: radial-gradient(ellipse at top, #1a1a1a 0%, #000000 100%);
+            background-attachment: fixed;
+            color: #ffffff;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* 动态网格背景效果 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* 重复的线性渐变创建网格 */
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* 顶部光晕效果 */
+        body::after {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            height: 100%;
+            /* 径向渐变创建聚光灯效果 */
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ==================== Header 样式 ==================== */
+        header {
+            padding: 60px 0 120px;
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 3.5rem;
+            font-weight: 800;
+            /* 文字渐变：白色到灰色 */
+            background: linear-gradient(135deg, #ffffff 0%, #888888 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 20px;
+            /* 文字阴影营造深度 */
+            text-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+            animation: fadeInDown 1s ease;
+        }
+
+        .subtitle {
+            font-size: 1.3rem;
+            color: #aaaaaa;
+            margin-bottom: 40px;
+            animation: fadeInUp 1s ease 0.2s both;
+        }
+
+        .badges {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 40px;
+            animation: fadeInUp 1s ease 0.4s both;
+        }
+
+        /* ==================== 徽章样式（玻璃态效果）==================== */
+        .badge {
+            /* 半透明白色背景 */
+            background: rgba(255, 255, 255, 0.05);
+            /* 毛玻璃效果 */
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            /* 细边框 */
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            /* 多层阴影营造深度 */
+            box-shadow: 
+                0 4px 6px rgba(0, 0, 0, 0.1),
+                0 1px 3px rgba(0, 0, 0, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .badge:hover {
+            /* 悬停时增强阴影 */
+            box-shadow: 
+                0 8px 12px rgba(0, 0, 0, 0.2),
+                0 2px 6px rgba(0, 0, 0, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            animation: fadeInUp 1s ease 0.6s both;
+        }
+
+        /* ==================== 按钮样式 ==================== */
+        .btn {
+            padding: 14px 32px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 主按钮：白色背景 */
+        .btn-primary {
+            background: #ffffff;
+            color: #000000;
+            /* 多层阴影创建浮起效果 */
+            box-shadow: 
+                0 10px 25px rgba(255, 255, 255, 0.3),
+                0 5px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 悬停时的发光效果 */
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 
+                0 15px 35px rgba(255, 255, 255, 0.4),
+                0 8px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        /* 次要按钮：透明背景 */
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            color: #ffffff;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 
+                0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-3px);
+            box-shadow: 
+                0 8px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        /* ==================== Features 区域 ==================== */
+        .features {
+            padding: 80px 0;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 60px;
+            font-weight: 700;
+            /* 渐变文字 */
+            background: linear-gradient(135deg, #ffffff 0%, #aaaaaa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+        }
+
+        /* ==================== 卡片样式（核心）==================== */
+        .feature-card {
+            /* 深色背景 */
+            background: linear-gradient(145deg, #1a1a1a 0%, #0d0d0d 100%);
+            /* 细边框 */
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 40px 30px;
+            text-align: center;
+            position: relative;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: fadeInUp 1s ease both;
+            /* 多层阴影创建深度 */
+            box-shadow: 
+                0 10px 30px rgba(0, 0, 0, 0.5),
+                0 1px 2px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        /* 卡片顶部高光 */
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(255, 255, 255, 0.2) 50%, 
+                transparent 100%);
+        }
+
+        .feature-card:nth-child(1) { animation-delay: 0.1s; }
+        .feature-card:nth-child(2) { animation-delay: 0.2s; }
+        .feature-card:nth-child(3) { animation-delay: 0.3s; }
+        .feature-card:nth-child(4) { animation-delay: 0.4s; }
+
+        /* 悬停效果：上浮 + 强化阴影 */
+        .feature-card:hover {
+            transform: translateY(-15px);
+            /* 增强阴影营造悬浮感 */
+            box-shadow: 
+                0 20px 50px rgba(0, 0, 0, 0.7),
+                0 5px 15px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            /* 图标发光效果 */
+            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+        }
+
+        .feature-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: #ffffff;
+        }
+
+        .feature-card p {
+            color: #aaaaaa;
+            line-height: 1.6;
+        }
+
+        /* ==================== 步骤卡片 ==================== */
+        .how-to-use {
+            padding: 80px 0;
+        }
+
+        .steps {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .step {
+            background: linear-gradient(145deg, #1a1a1a 0%, #0d0d0d 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+            animation: fadeInLeft 1s ease both;
+            box-shadow: 
+                0 10px 30px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            position: relative;
+        }
+
+        /* 左侧装饰线 */
+        .step::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 20%;
+            bottom: 20%;
+            width: 3px;
+            background: linear-gradient(180deg, 
+                transparent 0%,
+                #ffffff 50%,
+                transparent 100%);
+        }
+
+        .step:nth-child(1) { animation-delay: 0.1s; }
+        .step:nth-child(2) { animation-delay: 0.2s; }
+        .step:nth-child(3) { animation-delay: 0.3s; }
+
+        /* ==================== 步骤编号（渐变圆圈）==================== */
+        .step-number {
+            display: inline-block;
+            width: 50px;
+            height: 50px;
+            /* 白到灰的渐变 */
+            background: linear-gradient(135deg, #ffffff 0%, #666666 100%);
+            border-radius: 50%;
+            text-align: center;
+            line-height: 50px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #000000;
+            margin-bottom: 20px;
+            /* 圆圈阴影 */
+            box-shadow: 
+                0 5px 15px rgba(255, 255, 255, 0.3),
+                0 2px 5px rgba(0, 0, 0, 0.5);
+        }
+
+        .step h3 {
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+            color: #ffffff;
+        }
+
+        .step p {
+            color: #aaaaaa;
+            line-height: 1.8;
+            margin-bottom: 20px;
+        }
+
+        /* ==================== 代码块样式 ==================== */
+        .step code {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            color: #00ff00;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .step-image {
+            margin-top: 20px;
+            border-radius: 10px;
+            max-width: 100%;
+			 max-height: 450px;  
+            border: 1px solid rgba(255, 255, 255, 0.1);
+			 height: auto; 
+			 width: auto;
+			object-fit: contain;
+            transition: all 0.3s ease;
+            /* 图片阴影 */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .step-image:hover {
+            transform: scale(1.02);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.7);
+        }
+
+        /* ==================== 下载区域 ==================== */
+        .download-section {
+            padding: 80px 0;
+            text-align: center;
+        }
+
+        .download-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin-top: 50px;
+        }
+
+        .download-card {
+            background: linear-gradient(145deg, #1a1a1a 0%, #0d0d0d 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 30px;
+            transition: all 0.3s ease;
+            box-shadow: 
+                0 10px 25px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .download-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 
+                0 20px 40px rgba(0, 0, 0, 0.7),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .download-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: #ffffff;
+        }
+
+        .download-card .size {
+            color: #888888;
+            margin-bottom: 20px;
+        }
+
+        /* ==================== Footer ==================== */
+        footer {
+            padding: 60px 0 40px;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .footer-links a {
+            color: #aaaaaa;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .footer-links a:hover {
+            color: #ffffff;
+        }
+
+        /* ==================== 动画定义 ==================== */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* ==================== 响应式 ==================== */
+        @media (max-width: 768px) {
+            .logo {
+                font-size: 2.5rem;
+            }
+
+            .subtitle {
+                font-size: 1.1rem;
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+
+            .step {
+                padding: 30px 20px;
+            }
+        }
+
+        /* ==================== 代码块和链接示例 ==================== */
+        .code-block {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .code-block code {
+            color: #00ff00;
+            background: none;
+            padding: 0;
+            border: none;
+        }
+
+        .link-example {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 3px solid #ffffff;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            overflow-x: auto;
+            color: #aaaaaa;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <h1 class="logo">🎵 Bilibili Audio Downloader</h1>
+            <p class="subtitle">Download audio from Bilibili videos and collections effortlessly</p>
+            
+            <div class="badges">
+                <span class="badge">✨ Multi-Progress Bars</span>
+                <span class="badge">🚀 Concurrent Downloads</span>
+                <span class="badge">🎼 MP3/FLAC/M4A Support</span>
+                <span class="badge">📦 Collection Support</span>
+            </div>
+
+            <div class="cta-buttons">
+                <a href="#download" class="btn btn-primary">
+                    <span>📥</span> Download Now
+                </a>
+                <a href="https://github.com/zk39/BiliAudioDownloader" class="btn btn-secondary" target="_blank">
+                    <span>⭐</span> View on GitHub
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Features -->
+    <section class="features">
+        <div class="container">
+            <h2 class="section-title">✨ Features</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Single & Collection</h3>
+                    <p>Download individual videos or entire collections with ease</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Multi-Progress Bars</h3>
+                    <p>Track multiple downloads with beautiful progress indicators</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Concurrent Downloads</h3>
+                    <p>Download up to 3 tracks simultaneously for maximum speed</p>
+                </div>
+                <!-- <div class="feature-card">
+                    <div class="feature-icon">🎼</div>
+                    <h3>Format Options</h3>
+                    <p>Choose between MP3 (320k), FLAC, or M4A formats</p>
+                </div> -->
+            </div>
+        </div>
+    </section>
+
+    <!-- How to Use -->
+    <section class="how-to-use">
+        <div class="container">
+            <h2 class="section-title">🚀 How to Use</h2>
+            <div class="steps">
+                <!-- Step 0 -->
+                <div class="step">
+                    <span class="step-number">0</span>
+                    <h3>Install</h3>
+                    <p>Install via npm and run the command:</p>
+                    <div class="code-block">
+                        <code>npm i bili-audio-downloader</code><br>
+                        <code>bad</code>
+                    </div>
+                    <img src="https://github.com/user-attachments/assets/f73b887c-fc1a-4d31-b797-88b1e21fc56a" 
+                         alt="Install screenshot" 
+                         class="step-image"
+                         width="1238"
+                         height="900">
+                </div>
+
+                <!-- Step 1 -->
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <h3>Get Your Cookie</h3>
+                    <p>Go to <strong>bilibili.com</strong>, open DevTools (F12 or right-click → Inspect), and type:</p>
+                    <div class="code-block">
+                        <code>document.cookie</code>
+                    </div>
+                    <p>Copy the entire cookie string and paste it when prompted.</p>
+                    <img src="https://github.com/user-attachments/assets/ac526053-0ca8-4df3-8a85-ff5ba139e0b7" 
+                         alt="Cookie screenshot" 
+                         class="step-image"
+                         width="2086"
+                         height="900">
+                </div>
+
+                <!-- Step 2 -->
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <h3>Paste the Link</h3>
+                    <p>Copy a Bilibili video or collection link and paste it:</p>
+                    
+                    <p><strong>For single video:</strong></p>
+                    <div class="link-example">
+                        https://www.bilibili.com/video/BV1UBmUBqEDe/
+                    </div>
+                    <img src="https://github.com/user-attachments/assets/98912072-91c2-42c6-9136-f0b431e5d667" 
+                         alt="Single video download" 
+                         class="step-image"
+                         width="1736"
+                         height="900">
+
+                    <p style="margin-top: 30px;"><strong>For collections:</strong></p>
+                    <div class="link-example">
+                        https://space.bilibili.com/1437582453/lists/1235710?type=season
+                    </div>
+                    <img src="https://github.com/user-attachments/assets/6ffc1d17-4dbe-469f-9717-74491dd02fe9" 
+                         alt="Collection list" 
+                         class="step-image"
+                         width="1904"
+                         height="900">
+                    <img src="https://github.com/user-attachments/assets/127d6e8a-5783-43fa-b22a-4afbfb511f64" 
+                         alt="Collection download" 
+                         class="step-image"
+                         width="1582"
+                         height="900"
+                         style="margin-top: 20px;">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Download -->
+    <section class="download-section" id="download">
+        <div class="container">
+            <h2 class="section-title">📥 Download</h2>
+            <p style="font-size: 1.2rem; color: #aaaaaa; margin-bottom: 20px;">
+                Choose your platform and start downloading
+            </p>
+
+            <div class="download-grid">
+                <div class="download-card">
+                    <h3>🪟 Windows</h3>
+                    <p class="size">~50-80 MB</p>
+                    <a  target="_blank" href="https://github.com/zk39/BiliAudioDownloader/releases/tag/BiliAudioDownloader" 
+                       class="btn btn-primary">
+                        Download bili-downloader-win-withffmpeg.zip
+
+                    </a>
+                </div>
+
+                 
+
+               
+
+                <div class="download-card">
+                    <a style="text-decoration:none" target="_blank" href="https://www.npmjs.com/package/bili-audio-downloader?activeTab=readme">
+					<h3>📦 NPM</h3>
+					
+                    <p class="size">Cross-platform</p>
+                    <div class="code-block" style="margin: 20px 0;">
+                        <code>npm i -g bili-audio-downloader</code>
+                    </div>
+					</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-links">
+                <a  target="_blank" href="https://github.com/zk39/BiliAudioDownloader">GitHub</a>
+                     <a  target="_blank" href="https://github.com/zk39/BiliAudioDownloader/releases/tag/BiliAudioDownloader">Releases</a>
+            </div>
+            <p style="color: #666666;">
+                zk39
+            </p>
+            <p style="color: #444444; margin-top: 10px; font-size: 0.9rem;">
+                © 2026 Bilibili Audio Downloader | MIT License
+            </p>
+        </div>
+    </footer>
+</body>
+</html>

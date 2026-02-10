@@ -35,11 +35,14 @@
 			"*.flac",
 			"*.mp3",
 			"test.html",
-			"playinfo.json"
+			"playinfo.json",
+			"*.md"
 		],
 		"ext": "ts,js,json"
 	},
-	"bin": "./downloader.js",
+	"bin": {
+		"bad": "./dist/downloader.js"
+	},
 	"pkg": {
 		"assets": [
 			"node_modules/chalk/**/*"
@@ -49,9 +52,17 @@
 			"node18-macos-x64"
 		]
 	},
-	"name": "bilibili-audio-downloader",
-	"version": "0.0.1",
-	"description": "Download audio from Bilibili videos",
-	"author": "kun",
-	"license": "MIT"
+	"files": [
+		"dist",
+		"README.md",
+		"README.en-US.md",
+		"README.zh-CN.md",
+		"package.json"
+	],
+	"name": "bili-audio-downloader",
+	"version": "0.0.3d",
+	"description": "Download and convert audio from Bilibili",
+	"author": "kunz",
+	"license": "MIT",
+	"keywords": ["bilibili","audio","cli","terminal","audiodownloader"]
 }
