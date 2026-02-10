@@ -1,22 +1,4 @@
-<<<<<<< HEAD
-[English](README.md)
-
-```
-0. Use npm i bili-audio-downloader to download,
-then type bad in your cli
-```
-
-<img width="1238" height="944" alt="image" src="https://github.com/user-attachments/assets/f73b887c-fc1a-4d31-b797-88b1e21fc56a" />
-
-```
-1. Find your cookie and paste it, please go to bilibili website,open console (right click -> inspect)
-and type document.cookie to get your bilibili Cookie
-```
-
-<img width="2086" height="1348" alt="image" src="https://github.com/user-attachments/assets/ac526053-0ca8-4df3-8a85-ff5ba139e0b7" />
-=======
 [简体中文](docs/README.zh-CN.md) | [English](docs/README.en-US.md) | [About How to get your cookies/如何获得你的cookie](docs/HowToGetUrAuthToken.md)
->>>>>>> 386c152527f9bb78c2adb485246faf2810178bad
 
 # BiliAudioDownloader
 
@@ -26,13 +8,11 @@ and type document.cookie to get your bilibili Cookie
 
 这个项目的核心功能就是把 B 站视频转成音频。
 
-~~目的是为了让本人上下班路上可以有ai东雪莲的曲子听~~
+~~核心目的是为了让本人上下班路上可以有ai东雪莲的曲子听~~
 
 ## 技术和已有功能
 
-可以下载单个视频音频以及合集音频
-
-用的 TypeScript，关于解析 HTML 的部分是源自于 BV1yyN1eMEgj 这个视频的灵感。
+用的 TypeScript，关于解析 HTML 部分是源自于 BV1yyN1eMEgj 这个视频的灵感。
 
 不确定 B 站的检测机制，所以下载并发数设置默认为 3，如果下载失败会将失败的数据存起来然后重新下载。
 
@@ -56,42 +36,19 @@ and type document.cookie to get your bilibili Cookie
 
 ## 使用教程
 
-
-### 0. 你得有nodejs环境 然后
-```
- npm i bili-audio-downloader
-```
-<<<<<<< HEAD
-
-Link example:
-=======
-再然后输入 bad 在命令行中
-
-<img width="1238" height="944" alt="image" src="https://github.com/user-attachments/assets/f73b887c-fc1a-4d31-b797-88b1e21fc56a" />
-
-
 ### 1. 找到你的 cookie 并粘贴它
 
-请查看"[如何获得你的cookie](docs/HowToGetUrAuthToken.md)"页面来获取你的 B 站 Cookie
+请查看"[如何获得你的cookie](/docs/HowToGetUrAuthToken.md)"页面来获取你的 B 站 Cookie
 
 <img width="600" alt="image" src="https://github.com/user-attachments/assets/ac526053-0ca8-4df3-8a85-ff5ba139e0b7" />
 
 ### 2. 复制链接并点击回车
 
 **单个视频链接示例：**
->>>>>>> 386c152527f9bb78c2adb485246faf2810178bad
 
 ```
 https://www.bilibili.com/video/BV1UBmUBqEDe/?spm_id_from=333.337.search-card.all.click
 ```
-<<<<<<< HEAD
-
-<img width="1736" height="1030" alt="image" src="https://github.com/user-attachments/assets/98912072-91c2-42c6-9136-f0b431e5d667" />
-
-Or
-Copy the collection link, paste it, and click Enter
-Link example:
-=======
 
 <img width="600" alt="image" src="https://github.com/user-attachments/assets/98912072-91c2-42c6-9136-f0b431e5d667" />
 
@@ -100,16 +57,10 @@ Link example:
 复制合集链接，粘贴它，然后点击回车
 
 合集链接示例：
->>>>>>> 386c152527f9bb78c2adb485246faf2810178bad
 
 ```
 https://space.bilibili.com/1437582453/lists/1235710?type=season
 ```
-<<<<<<< HEAD
-
-  <img width="1904" height="1482" alt="image" src="https://github.com/user-attachments/assets/6ffc1d17-4dbe-469f-9717-74491dd02fe9" />
-=======
->>>>>>> 386c152527f9bb78c2adb485246faf2810178bad
 
 <img width="600" alt="image" src="https://github.com/user-attachments/assets/6ffc1d17-4dbe-469f-9717-74491dd02fe9" />
 
